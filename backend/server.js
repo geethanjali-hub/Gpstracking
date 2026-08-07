@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -743,6 +746,19 @@ signInWithEmailAndPassword(auth, "esp32@ibots.academy", "IbotsGPS2026!")
   .catch((authErr) => {
     console.warn(`⚠️ Firebase Auth Warning: ${authErr.message}`);
   });
+
+// Serve production frontend static assets if available
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDistPath = path.join(__dirname, '../frontend/dist');
+
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
 
 // Start Server on 3001
 const PORT = process.env.PORT || 3001;

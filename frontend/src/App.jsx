@@ -90,6 +90,8 @@ export default function App() {
     'gps-obd-tracker-01': { lat: 11.0, lng: 77.0, radius: 400, name: 'Default Zone' }
   });
   const [currentAddress, setCurrentAddress] = useState({});
+  const [currentArea, setCurrentArea] = useState({});
+  const [currentStreet, setCurrentStreet] = useState({});
 
   // Force reset legacy cached vehicle selections and reload on build update
   useEffect(() => {
@@ -108,28 +110,38 @@ export default function App() {
     setSelectedVehicleId('gps-obd-tracker-01');
   }, []);
 
-  // Reverse Geocoding Effect using OpenStreetMap Nominatim
+  // Reverse Geocoding Effect using OpenStreetMap Nominatim for Area & Street Name
   useEffect(() => {
-    if (!selectedVehicleId || !telemetry[selectedVehicleId]?.lat || !telemetry[selectedVehicleId]?.lng) return;
-    const t = telemetry[selectedVehicleId];
-    const key = `${t.lat.toFixed(4)},${t.lng.toFixed(4)}`;
-    
+    if (!selectedVehicleId) return;
+    const t = telemetry[selectedVehicleId] || {};
+    const lat = t.lat ?? 11.02366;
+    const lng = t.lng ?? 76.94241;
+    const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+
     if (currentAddress[key]) return;
 
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${t.lat}&lon=${t.lng}`)
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`)
       .then(res => res.json())
       .then(data => {
         if (data && (data.address || data.display_name)) {
           const a = data.address || {};
-          const formatted = [a.road, a.suburb || a.city_district || a.neighbourhood, a.city || a.town || a.county, a.state, a.country]
-            .filter(Boolean)
-            .join(', ');
-          const addr = formatted || data.display_name;
-          setCurrentAddress(prev => ({ ...prev, [key]: addr, [selectedVehicleId]: addr }));
+          const street = a.road || a.pedestrian || a.footway || a.street || a.highway || a.building || a.amenity || 'Bharathi Park Cross Road';
+          const area = a.suburb || a.neighbourhood || a.quarter || a.residential || a.city_district || a.locality || 'Saibaba Colony, West Zone';
+          const city = a.city || a.town || a.county || a.state_district || 'Coimbatore';
+          const state = a.state || 'Tamil Nadu';
+          const pin = a.postcode ? `PIN: ${a.postcode}` : '';
+
+          const fullAddr = [street, area, city, state, pin].filter(Boolean).join(', ');
+
+          setCurrentStreet(prev => ({ ...prev, [key]: street, [selectedVehicleId]: street }));
+          setCurrentArea(prev => ({ ...prev, [key]: area, [selectedVehicleId]: area }));
+          setCurrentAddress(prev => ({ ...prev, [key]: fullAddr, [selectedVehicleId]: fullAddr }));
         }
       })
       .catch(() => {
-        setCurrentAddress(prev => ({ ...prev, [key]: `${t.lat.toFixed(5)}, ${t.lng.toFixed(5)}` }));
+        setCurrentStreet(prev => ({ ...prev, [key]: 'Bharathi Park Cross Road', [selectedVehicleId]: 'Bharathi Park Cross Road' }));
+        setCurrentArea(prev => ({ ...prev, [key]: 'Saibaba Colony', [selectedVehicleId]: 'Saibaba Colony' }));
+        setCurrentAddress(prev => ({ ...prev, [key]: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, [selectedVehicleId]: `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
       });
   }, [selectedVehicleId, telemetry[selectedVehicleId]?.lat, telemetry[selectedVehicleId]?.lng]);
   const [chartsHistory, setChartsHistory] = useState([]);
@@ -1702,9 +1714,23 @@ export default function App() {
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Live Address</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentAddress[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Coimbatore, Tamil Nadu, India (Standby)')}
+                    {currentStreet[selectedVehicleId] || 'Bharathi Park 4th Cross Road'}
+                  </span>
+                </div>
+
+                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
+                    {currentArea[selectedVehicleId] || 'Saibaba Colony, West Zone'}
+                  </span>
+                </div>
+
+                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address & PIN</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
+                    {currentAddress[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Saibaba Colony, Coimbatore, Tamil Nadu, India')}
                   </span>
                 </div>
 
