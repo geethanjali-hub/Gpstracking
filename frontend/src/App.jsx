@@ -27,7 +27,7 @@ import { subscribeToTelemetry } from './firebase';
 import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getUserProfile, authFetch } from './api';
 
 export default function App() {
-  const [token, setToken] = useState(getAccessToken() || 'guest-token');
+  const [token, setToken] = useState(getAccessToken() || null);
   const [role, setRole] = useState(getUserProfile()?.role || localStorage.getItem('role') || 'viewer');
   const [activeTab, setActiveTab] = useState('tracking');
   
@@ -301,10 +301,14 @@ export default function App() {
 
   // Handle Logout & Token Revocation
   const handleLogout = async () => {
-    await apiLogout();
-    setToken('guest-token');
+    try {
+      await apiLogout();
+    } catch (e) {}
+    setToken(null);
     setRole('viewer');
     localStorage.removeItem('role');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('userProfile');
   };
 
   // Fetch Vehicles with local fallback
@@ -944,7 +948,7 @@ export default function App() {
   }, [activeTab, chartsHistory, shockDataList, dailySummary]);
 
   // Auth screen
-  if (!token) {
+  if (!token || token === 'guest-token') {
     return (
       <div className="auth-wrapper">
         <div className="auth-box" style={{ maxWidth: '420px' }}>
