@@ -227,14 +227,18 @@ export default function App() {
   });
 
   // Map and Chart Refs
-  const mapRef = useRef(null);
-  const mapInstance = useRef(null);
-  const markerInstance = useRef(null);
+  const dashboardMapRef = useRef(null);
+  const trackingMapRef = useRef(null);
+  const dashboardMapInstance = useRef(null);
+  const trackingMapInstance = useRef(null);
+  const dashboardMarkerInstance = useRef(null);
+  const trackingMarkerInstance = useRef(null);
   const routeLineRef = useRef(null);
   const geofenceCircleRef = useRef(null);
 
   const engineChartRef = useRef(null);
   const engineChartInstance = useRef(null);
+  const prevCoordsRef = useRef(null);
   const fuelLevelChartRef = useRef(null);
   const fuelLevelChartInstance = useRef(null);
   const fuelConsumptionChartRef = useRef(null);
@@ -527,7 +531,8 @@ export default function App() {
       const backendHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'localhost'
         : '64.227.179.37';
-      const wsUrl = `ws://${backendHost}:3001`;
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = `${wsProtocol}://${backendHost}:3001`;
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
@@ -578,25 +583,33 @@ export default function App() {
   // Render & Update Leaflet Map synchronously without flickering or initialization errors
   useEffect(() => {
     if (activeTab !== 'home' && activeTab !== 'tracking') return;
-    const container = mapRef.current;
+    const container = activeTab === 'home' ? dashboardMapRef.current : trackingMapRef.current;
     if (!container) return;
 
     const currentData = telemetry[selectedVehicleId] || {};
     const hasValidCoords = currentData.lat != null && currentData.lng != null && currentData.isOnline !== false;
-    const coords = hasValidCoords ? [currentData.lat, currentData.lng] : [11.00659, 77.01404];
+    const mapInstanceRef = activeTab === 'home' ? dashboardMapInstance : trackingMapInstance;
+    const markerRef = activeTab === 'home' ? dashboardMarkerInstance : trackingMarkerInstance;
+    const centerCoords = hasValidCoords
+      ? [currentData.lat, currentData.lng]
+      : (mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : [11.00659, 77.01404]);
 
     // Initialize Leaflet Map if container changed or map is not active
-    if (!mapInstance.current || mapInstance.current._container !== container) {
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
+    if (!mapInstanceRef.current || mapInstanceRef.current._container !== container) {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
       }
+      markerRef.current = null;
+      routeLineRef.current = null;
+      geofenceCircleRef.current = null;
+
       if (container._leaflet_id) {
         delete container._leaflet_id;
       }
 
-      const map = L.map(container, { zoomControl: false }).setView(coords, hasValidCoords ? 16 : 13);
-      mapInstance.current = map;
+      const map = L.map(container, { zoomControl: false }).setView(centerCoords, hasValidCoords ? 16 : 13);
+      mapInstanceRef.current = map;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
@@ -606,56 +619,74 @@ export default function App() {
       L.control.zoom({ position: 'topright' }).addTo(map);
 
       setTimeout(() => {
-        if (mapInstance.current) mapInstance.current.invalidateSize();
+        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
       }, 250);
     }
 
-    // Update marker and view smoothly — Always display marker (Standby or Live)
-    if (activeTab === 'tracking') {
-      const activeLat = currentData.lat ?? 11.00659;
-      const activeLng = currentData.lng ?? 77.01404;
-      const currentCoords = [activeLat, activeLng];
+    // Update marker and view smoothly without tearing or map flickering
+    if (activeTab === 'tracking' && mapInstanceRef.current) {
+      if (hasValidCoords) {
+        const currentCoords = [currentData.lat, currentData.lng];
+        const heading = currentData.heading || 0;
+        const markerColor = '#06b6d4';
+        const markerSymbol = '🛰️';
 
-      const markerColor = hasValidCoords ? '#06b6d4' : '#f59e0b';
-      const markerSymbol = hasValidCoords ? '🛰️' : '📡';
+        const popupContent = `
+          <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
+            <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} ESP32 SIM A7670C Hardware</strong><br/>
+            <strong>Status:</strong> <span style="color:#10b981; font-weight:bold;">🟢 Live GPS Stream</span><br/>
+            <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}<br/>
+            <strong>Speed:</strong> ${Math.round(currentData.speed || 0)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}
+          </div>
+        `;
 
-      const iconHtml = `<div style="
-        transform: rotate(${currentData.heading || 0}deg);
-        width: 34px;
-        height: 34px;
-        background-color: ${markerColor};
-        border: 2px solid #ffffff;
-        border-radius: 50%;
-        box-shadow: 0 0 16px ${markerColor};
-        display:flex; align-items:center; justify-content:center;
-        font-size: 18px;
-      ">${markerSymbol}</div>`;
+        if (markerRef.current) {
+          // Update position smoothly without tile reset
+          markerRef.current.setLatLng(currentCoords);
+          markerRef.current.getPopup()?.setContent(popupContent);
 
-      const vehicleIcon = L.divIcon({
-        className: 'map-veh-icon',
-        html: iconHtml,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17]
-      });
+          const iconEl = markerRef.current.getElement()?.querySelector('.map-veh-icon-inner');
+          if (iconEl) {
+            iconEl.style.transform = `rotate(${heading}deg)`;
+          }
+        } else {
+          const iconHtml = `<div class="map-veh-icon-inner" style="
+            transform: rotate(${heading}deg);
+            width: 34px;
+            height: 34px;
+            background-color: ${markerColor};
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 16px ${markerColor};
+            display:flex; align-items:center; justify-content:center;
+            font-size: 18px;
+            transition: transform 0.3s ease;
+          ">${markerSymbol}</div>`;
 
-      const popupContent = `
-        <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
-          <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} ESP32 SIM A7670C Hardware</strong><br/>
-          <strong>Status:</strong> ${hasValidCoords ? '<span style="color:#10b981; font-weight:bold;">🟢 Live GPS Stream</span>' : '<span style="color:#f59e0b; font-weight:bold;">🟡 Online / Indoor Standby</span>'}<br/>
-          <strong>Lat:</strong> ${activeLat.toFixed(6)} | <strong>Lng:</strong> ${activeLng.toFixed(6)}<br/>
-          <strong>Speed:</strong> ${Math.round(currentData.speed || 0)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}
-        </div>
-      `;
+          const vehicleIcon = L.divIcon({
+            className: 'map-veh-icon',
+            html: iconHtml,
+            iconSize: [34, 34],
+            iconAnchor: [17, 17]
+          });
 
-      if (markerInstance.current) {
-        markerInstance.current.setLatLng(currentCoords);
-        markerInstance.current.setIcon(vehicleIcon);
-        markerInstance.current.getPopup()?.setContent(popupContent);
-        mapInstance.current.panTo(currentCoords);
+          markerRef.current = L.marker(currentCoords, { icon: vehicleIcon }).addTo(mapInstanceRef.current);
+          markerRef.current.bindPopup(popupContent).openPopup();
+          mapInstanceRef.current.setView(currentCoords, 16);
+          prevCoordsRef.current = currentCoords;
+        }
+
+        // Only pan map if position changed significantly (> ~10 meters) to avoid map tile flickering
+        const prev = prevCoordsRef.current;
+        if (!prev || Math.abs(prev[0] - currentCoords[0]) > 0.0001 || Math.abs(prev[1] - currentCoords[1]) > 0.0001) {
+          mapInstanceRef.current.panTo(currentCoords, { animate: true, duration: 0.5 });
+          prevCoordsRef.current = currentCoords;
+        }
       } else {
-        markerInstance.current = L.marker(currentCoords, { icon: vehicleIcon }).addTo(mapInstance.current);
-        markerInstance.current.bindPopup(popupContent).openPopup();
-        mapInstance.current.setView(currentCoords, hasValidCoords ? 16 : 14);
+        if (markerRef.current) {
+          mapInstanceRef.current.removeLayer(markerRef.current);
+          markerRef.current = null;
+        }
       }
     }
   }, [activeTab, selectedVehicleId, telemetry]);
@@ -1316,7 +1347,7 @@ export default function App() {
                       Showing {filteredVehicles.length} of {vehicles.length} vehicles {statusFilter !== 'all' ? `(Filter: ${statusFilter.toUpperCase()})` : ''}
                     </span>
                   </div>
-                  <div ref={mapRef} style={{ height: 'calc(100% - 37px)', width: '100%' }}></div>
+                  <div ref={dashboardMapRef} style={{ height: 'calc(100% - 37px)', width: '100%' }}></div>
                 </div>
 
                 {/* System alert feed */}
@@ -1577,7 +1608,7 @@ export default function App() {
                     <span style={{ backgroundColor: '#10b981', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
                     📡 Active Hardware Tracker: ESP32 SIM A7670C (gps-obd-tracker-01)
                   </div>
-                  <div ref={mapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
+                  <div ref={trackingMapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
                 <div className="panel-container">
                   <span className="panel-title"><Compass size={14} /> 📡 ESP32 SIM A7670C Tracker Details</span>
