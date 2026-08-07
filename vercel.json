@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd frontend && npm install && VITE_BASE=/ npx vite build",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

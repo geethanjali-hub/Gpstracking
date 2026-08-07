@@ -1,0 +1,9 @@
+{
+  "name": "gps-vehicle-tracking",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cd frontend && npm install && VITE_BASE=/ npx vite build && node -e \"import fs from 'fs'; fs.mkdirSync('../dist', { recursive: true }); fs.cpSync('dist', '../dist', { recursive: true })\"",
+    "start": "node backend/server.js"
+  }
+}
