@@ -91,11 +91,19 @@ export default function App() {
   });
   const [currentAddress, setCurrentAddress] = useState({});
 
-  // Force reset legacy cached vehicle selections on load
+  // Force reset legacy cached vehicle selections and reload on build update
   useEffect(() => {
     try {
-      localStorage.removeItem('selectedVehicleId');
-      localStorage.removeItem('vehicles');
+      const APP_BUILD_VER = '2026.08.07.HARDWARE_v9';
+      const storedVer = localStorage.getItem('app_build_version');
+      if (storedVer !== APP_BUILD_VER) {
+        localStorage.clear();
+        localStorage.setItem('app_build_version', APP_BUILD_VER);
+        if (storedVer) {
+          window.location.reload(true);
+          return;
+        }
+      }
     } catch (e) {}
     setSelectedVehicleId('gps-obd-tracker-01');
   }, []);
