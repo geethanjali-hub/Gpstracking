@@ -9,11 +9,11 @@ client.on('connect', () => {
     device_id: "gps-obd-tracker-01",
     location: {
       fix: true,
-      lat: 11.006590,
-      lng: 77.014040,
+      lat: 11.023660,
+      lng: 76.942410,
       speed_kph: 35.0,
       heading_deg: 180.0,
-      altitude_m: 314.0,
+      altitude_m: 362.5,
       satellites: 9,
       hdop: 1.1,
       source: "gps"
@@ -40,7 +40,7 @@ client.on('connect', () => {
   };
 
   client.publish('sedhupathi/gps-obd-tracker-01/data', JSON.stringify(livePayload), () => {
-    console.log('✅ Published live GPS coordinates (11.00659, 77.01404) to sedhupathi/gps-obd-tracker-01/data');
+    console.log('✅ Published live GPS coordinates (11.023660, 76.942410) to sedhupathi/gps-obd-tracker-01/data');
     client.end();
   });
 });
