@@ -108,28 +108,43 @@ export default function App() {
     setSelectedVehicleId('gps-obd-tracker-01');
   }, []);
 
-  // Reverse Geocoding Effect using OpenStreetMap Nominatim
+  // Reverse Geocoding Effect using OpenStreetMap Nominatim for Exact Street Name & Address
   useEffect(() => {
-    if (!selectedVehicleId || !telemetry[selectedVehicleId]?.lat || !telemetry[selectedVehicleId]?.lng) return;
-    const t = telemetry[selectedVehicleId];
-    const key = `${t.lat.toFixed(4)},${t.lng.toFixed(4)}`;
-    
+    if (!selectedVehicleId) return;
+    const t = telemetry[selectedVehicleId] || {};
+    const lat = t.lat ?? 11.00659;
+    const lng = t.lng ?? 77.01404;
+    const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+
     if (currentAddress[key]) return;
 
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${t.lat}&lon=${t.lng}`)
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`)
       .then(res => res.json())
       .then(data => {
         if (data && (data.address || data.display_name)) {
           const a = data.address || {};
-          const formatted = [a.road, a.suburb || a.city_district || a.neighbourhood, a.city || a.town || a.county, a.state, a.country]
-            .filter(Boolean)
-            .join(', ');
-          const addr = formatted || data.display_name;
-          setCurrentAddress(prev => ({ ...prev, [key]: addr, [selectedVehicleId]: addr }));
+          const buildingStr = [a.building, a.house_number, a.amenity || a.shop || a.office].filter(Boolean).join(' ');
+          const roadStr = a.road || a.pedestrian || a.footway || a.street || a.path || a.highway || '';
+          const areaStr = a.suburb || a.neighbourhood || a.residential || a.city_district || a.locality || a.village || '';
+          const cityStr = a.city || a.town || a.county || '';
+          const stateStr = a.state || '';
+          const pinStr = a.postcode ? `PIN: ${a.postcode}` : '';
+
+          const parts = [
+            buildingStr,
+            roadStr,
+            areaStr,
+            cityStr,
+            stateStr,
+            pinStr
+          ].filter(Boolean);
+
+          const formattedAddr = parts.length > 0 ? parts.join(', ') : data.display_name;
+          setCurrentAddress(prev => ({ ...prev, [key]: formattedAddr, [selectedVehicleId]: formattedAddr }));
         }
       })
       .catch(() => {
-        setCurrentAddress(prev => ({ ...prev, [key]: `${t.lat.toFixed(5)}, ${t.lng.toFixed(5)}` }));
+        setCurrentAddress(prev => ({ ...prev, [key]: `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
       });
   }, [selectedVehicleId, telemetry[selectedVehicleId]?.lat, telemetry[selectedVehicleId]?.lng]);
   const [chartsHistory, setChartsHistory] = useState([]);
