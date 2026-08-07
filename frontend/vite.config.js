@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // Set base dynamically: '/' for Vercel root deployments, '/gps-app/' for DigitalOcean subpath
 export default defineConfig({
-  base: process.env.VITE_BASE || '/gps-app/',
+  base: '/',
   plugins: [react()],
   server: {
     proxy: {
