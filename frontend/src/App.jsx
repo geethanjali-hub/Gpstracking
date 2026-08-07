@@ -513,11 +513,37 @@ export default function App() {
     alert(`Alert thresholds updated for vehicle ${selectedVehicleId}!`);
   };
 
-  // Firebase Cloud Firestore Real-Time Listener
+  // Helper to deduplicate telemetry updates and prevent UI blinking
+  const applyTelemetryUpdate = (vid, data) => {
+    if (!vid || !data) return;
+    setTelemetry(prev => {
+      const existing = prev[vid];
+      if (existing &&
+          existing.lat === data.lat &&
+          existing.lng === data.lng &&
+          existing.speed === data.speed &&
+          existing.heading === data.heading &&
+          existing.status === data.status &&
+          existing.isOnline === data.isOnline &&
+          existing.rpm === data.rpm &&
+          existing.fuelLevel === data.fuelLevel &&
+          existing.satellites === data.satellites) {
+        return prev; // Skip state change if telemetry hasn't changed
+      }
+      return {
+        ...prev,
+        [vid]: data
+      };
+    });
+  };
+
+  // Firebase Real-Time Listener with deduplication
   useEffect(() => {
     const unsubscribe = subscribeToTelemetry((liveData) => {
       if (liveData && Object.keys(liveData).length > 0) {
-        setTelemetry((prev) => ({ ...prev, ...liveData }));
+        for (const vid in liveData) {
+          applyTelemetryUpdate(vid, liveData[vid]);
+        }
       }
     });
     return () => unsubscribe();
@@ -539,14 +565,9 @@ export default function App() {
       ws.onmessage = (event) => {
         const payload = JSON.parse(event.data);
         if (payload.type === 'TELEMETRY_UPDATE') {
-          setTelemetry(prev => ({
-            ...prev,
-            [payload.vehicleId]: payload.data,
-            ...(payload.data?.vehicleId ? { [payload.data.vehicleId]: payload.data } : {})
-          }));
-          if (payload.alerts) setAlerts(payload.alerts);
-          if (payload.geofences) setGeofences(payload.geofences);
-          if (payload.routes) setRoutes(payload.routes);
+          if (payload.vehicleId && payload.data) {
+            applyTelemetryUpdate(payload.vehicleId, payload.data);
+          }
         }
       };
     } catch (e) {
