@@ -4,18 +4,18 @@ const conn = new Client();
 
 conn.on('ready', () => {
   console.log('⚡ SSH Connected');
-  const cmd = 'cd ~/gps_project && git fetch origin main && git reset --hard origin/main && cd backend && pm2 restart server || pm2 start server.js --name server';
-  
-  conn.exec(cmd, (err, stream) => {
+  conn.shell((err, stream) => {
     if (err) throw err;
-    stream.on('close', (code, signal) => {
-      console.log('Stream :: close :: code: ' + code + ', signal: ' + signal);
+    stream.on('close', () => {
       conn.end();
     }).on('data', (data) => {
-      console.log('STDOUT: ' + data);
-    }).stderr.on('data', (data) => {
-      console.log('STDERR: ' + data);
+      console.log(data.toString());
     });
+    stream.write('echo Dial2techGeetha | sudo -S ufw allow 3001/tcp\n');
+    stream.write('echo Dial2techGeetha | sudo -S ufw reload\n');
+    setTimeout(() => {
+      stream.write('\x03exit\n');
+    }, 3000);
   });
 }).connect({
   host: '64.227.179.37',
