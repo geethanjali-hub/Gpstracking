@@ -91,6 +91,15 @@ export default function App() {
   });
   const [currentAddress, setCurrentAddress] = useState({});
 
+  // Force reset legacy cached vehicle selections on load
+  useEffect(() => {
+    try {
+      localStorage.removeItem('selectedVehicleId');
+      localStorage.removeItem('vehicles');
+    } catch (e) {}
+    setSelectedVehicleId('gps-obd-tracker-01');
+  }, []);
+
   // Reverse Geocoding Effect using OpenStreetMap Nominatim
   useEffect(() => {
     if (!selectedVehicleId || !telemetry[selectedVehicleId]?.lat || !telemetry[selectedVehicleId]?.lng) return;
