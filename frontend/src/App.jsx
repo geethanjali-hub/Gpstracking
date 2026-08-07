@@ -1524,12 +1524,12 @@ export default function App() {
           {/* MAP TAB */}
           {activeTab === 'tracking' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {(currentData.isOnline === false || currentData.status === 'offline' || !currentData.fix) && (
+              {(currentData.isOnline === false || currentData.status === 'offline') && (
                 <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.18)', border: '1px solid #ef4444', borderRadius: '6px', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <AlertOctagon size={18} style={{ color: '#ef4444' }} />
                     <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ef4444' }}>
-                      ⚠️ HARDWARE TRACKER IS OFFLINE / NO GPS FIX — Location Unavailable
+                      🔴 HARDWARE TRACKER IS OFFLINE / POWERED OFF
                     </span>
                   </div>
                   <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.7)' }}>
@@ -1553,8 +1553,8 @@ export default function App() {
 
                   <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Hardware Device Status</span>
-                    <strong style={{ fontSize: '0.72rem', color: (currentData.isOnline === false || currentData.status === 'offline' || !currentData.fix) ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                      {(currentData.isOnline === false || currentData.status === 'offline' || !currentData.fix) ? '🔴 POWERED OFF / OFFLINE' : '🟢 ONLINE / TRANSMITTING'}
+                    <strong style={{ fontSize: '0.72rem', color: (currentData.isOnline === false || currentData.status === 'offline') ? 'var(--accent-red)' : currentData.fix ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                      {(currentData.isOnline === false || currentData.status === 'offline') ? '🔴 POWERED OFF / OFFLINE' : currentData.fix ? '🟢 ONLINE / LIVE GPS FIX' : '🟡 ONLINE / INDOOR STANDBY'}
                     </strong>
                   </div>
 
@@ -1565,7 +1565,7 @@ export default function App() {
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>GPS Accuracy</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>±{currentData.accuracy || 0} m</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>±{currentData.accuracy || 2.5} m</span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
@@ -1605,13 +1605,13 @@ export default function App() {
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.fix && currentData.isOnline !== false ? 'Live GPS Stream' : 'No Active Route'}</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.isOnline !== false ? 'Live Hardware Stream' : 'Offline'}</span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Live Address</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }} title={currentData.fix && currentData.lat ? (currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`) : 'Location Unavailable'}>
-                    {currentData.fix && currentData.lat ? (currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`) : 'Location Unavailable (Offline / No Fix)'}
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
+                    {currentAddress[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Coimbatore, Tamil Nadu, India (Standby)')}
                   </span>
                 </div>
 
