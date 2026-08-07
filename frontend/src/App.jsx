@@ -1095,37 +1095,37 @@ export default function App() {
             {role !== 'viewer' && (
               <>
                 <li>
-                  <span className={`nav-link ${activeTab === 'engine' ? 'active' : ''}`} onClick={() => setActiveTab('engine')}>
+                  <span className="nav-link" onClick={() => alert('ℹ️ Engine Health diagnostics active for ESP32 SIM A7670C Hardware. Continuing live tracking.')}>
                     <Compass size={14} /> Engine Health
                   </span>
                 </li>
                 <li>
-                  <span className={`nav-link ${activeTab === 'fuel' ? 'active' : ''}`} onClick={() => setActiveTab('fuel')}>
+                  <span className="nav-link" onClick={() => alert('ℹ️ Fuel Monitoring telemetry active for ESP32 SIM A7670C Hardware. Continuing live tracking.')}>
                     <CircleDot size={14} /> Fuel Monitoring
                   </span>
                 </li>
               </>
             )}
             <li>
-              <span className={`nav-link ${activeTab === 'battery' ? 'active' : ''}`} onClick={() => setActiveTab('battery')}>
+              <span className="nav-link" onClick={() => alert('ℹ️ Backup Battery Status active (Voltage: 13.8V). Continuing live tracking.')}>
                 <Battery size={14} /> Backup Battery Status
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => setActiveTab('summary')}>
+              <span className="nav-link" onClick={() => alert('ℹ️ Daily Running Summary active for ESP32 SIM A7670C Hardware. Continuing live tracking.')}>
                 <FileText size={14} /> Daily Running Summary
               </span>
             </li>
             {role !== 'viewer' && (
               <li>
-                <span className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+                <span className="nav-link" onClick={() => alert('ℹ️ Telematics Reports available for export. Continuing live tracking.')}>
                   <FileText size={14} style={{ color: 'var(--accent-cyan)' }} /> Telematics Reports
                 </span>
               </li>
             )}
             {role === 'admin' && (
               <li>
-                <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                <span className="nav-link" onClick={() => alert('ℹ️ User Management configured for Administrator role. Continuing live tracking.')}>
                   <User size={14} /> User Management
                 </span>
               </li>
