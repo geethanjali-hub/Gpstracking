@@ -1528,8 +1528,8 @@ export default function App() {
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '1.25rem', height: '540px' }}>
-                <div className="panel-container" style={{ padding: 0, overflow: 'hidden' }}>
-                  <div ref={mapRef} style={{ height: '100%', width: '100%' }}></div>
+                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px', minHeight: '540px', position: 'relative' }}>
+                  <div ref={mapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
                 <div className="panel-container">
                   <span className="panel-title"><Compass size={14} /> Live Tracking Details</span>
