@@ -312,11 +312,13 @@ export default function App() {
     try {
       const res = await fetch('/api/vehicles');
       const data = await res.json();
-      const list = (data && data.length > 0) ? data : hardwareVehicle;
-      setVehicles(list);
+      const list = (Array.isArray(data) && data.length > 0)
+        ? data.filter(v => v && (v.id === 'gps-obd-tracker-01' || v.id === 'ESP32 SIM A7670C Hardware Tracker'))
+        : hardwareVehicle;
+      const finalList = list.length > 0 ? list : hardwareVehicle;
+      setVehicles(finalList);
       setSelectedVehicleId('gps-obd-tracker-01');
     } catch (err) {
-      console.warn("Backend fetch fallback. Loading single hardware device.");
       setVehicles(hardwareVehicle);
       setSelectedVehicleId('gps-obd-tracker-01');
     }
