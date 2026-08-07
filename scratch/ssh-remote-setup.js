@@ -4,7 +4,7 @@ const conn = new Client();
 
 conn.on('ready', () => {
   console.log('⚡ SSH Connected');
-  const cmd = 'tail -n 20 ~/.pm2/logs/server-out.log';
+  const cmd = 'cd ~/gps_project && git fetch origin main && git reset --hard origin/main && cd backend && pm2 restart server || pm2 start server.js --name server';
   
   conn.exec(cmd, (err, stream) => {
     if (err) throw err;

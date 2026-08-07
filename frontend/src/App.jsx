@@ -93,7 +93,7 @@ export default function App() {
 
   // Reverse Geocoding Effect using OpenStreetMap Nominatim
   useEffect(() => {
-    if (!selectedVehicleId || !telemetry[selectedVehicleId]?.lat || !telemetry[selectedVehicleId]?.lng || !telemetry[selectedVehicleId]?.fix) return;
+    if (!selectedVehicleId || !telemetry[selectedVehicleId]?.lat || !telemetry[selectedVehicleId]?.lng) return;
     const t = telemetry[selectedVehicleId];
     const key = `${t.lat.toFixed(4)},${t.lng.toFixed(4)}`;
     
@@ -563,7 +563,7 @@ export default function App() {
     if (!container) return;
 
     const currentData = telemetry[selectedVehicleId] || {};
-    const hasValidCoords = currentData.lat != null && currentData.lng != null && currentData.fix && currentData.isOnline !== false;
+    const hasValidCoords = currentData.lat != null && currentData.lng != null && currentData.isOnline !== false;
     const coords = hasValidCoords ? [currentData.lat, currentData.lng] : [11.00659, 77.01404];
 
     // Initialize Leaflet Map if container changed or map is not active

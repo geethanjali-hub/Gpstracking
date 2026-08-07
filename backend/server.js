@@ -406,10 +406,10 @@ app.post('/api/telemetry', async (req, res) => {
                            typeof rawLng === 'number' && !isNaN(rawLng) && rawLng !== 0;
 
     const fixFlag = payload.gps?.valid ?? payload.gps?.fix ?? payload.location?.fix ?? payload.fix;
-    const hasFix = (fixFlag !== false && fixFlag !== 0 && fixFlag !== "false") && hasValidCoords;
+    const hasFix = Boolean(fixFlag) || hasValidCoords;
 
-    const lat = hasFix ? rawLat : null;
-    const lng = hasFix ? rawLng : null;
+    const lat = hasValidCoords ? rawLat : null;
+    const lng = hasValidCoords ? rawLng : null;
 
     // Format full hardware packet into standardized telematics state
     const telemetryDoc = {
@@ -619,11 +619,11 @@ mqttClient.on('message', async (topic, message) => {
                            typeof rawLng === 'number' && !isNaN(rawLng) && rawLng !== 0;
 
     const fixFlag = raw.location?.fix ?? raw.gps?.fix ?? raw.gps?.valid ?? raw.fix;
-    const hasFix = (fixFlag !== false && fixFlag !== 0 && fixFlag !== "false") && hasValidCoords;
+    const hasFix = Boolean(fixFlag) || hasValidCoords;
 
-    // Use live coordinates ONLY if fix is valid and non-zero. NO fallback coordinates when fix is false or offline.
-    const lat = hasFix ? rawLat : null;
-    const lng = hasFix ? rawLng : null;
+    // Use live coordinates whenever valid numbers are transmitted by hardware (GPS, LBS Cell tower, or last known position)
+    const lat = hasValidCoords ? rawLat : null;
+    const lng = hasValidCoords ? rawLng : null;
 
     // Map ESP32 MQTT JSON format -> standardized telemetry format
     const telemetryDoc = {
