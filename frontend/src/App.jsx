@@ -591,50 +591,52 @@ export default function App() {
       }, 250);
     }
 
-    // Update marker and view smoothly
+    // Update marker and view smoothly — Always display marker (Standby or Live)
     if (activeTab === 'tracking') {
-      if (hasValidCoords) {
-        const iconHtml = `<div style="
-          transform: rotate(${currentData.heading || 0}deg);
-          width: 34px;
-          height: 34px;
-          background-color: #06b6d4;
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          box-shadow: 0 0 16px rgba(6,182,212,0.9);
-          display:flex; align-items:center; justify-content:center;
-          font-size: 18px;
-        ">🛰️</div>`;
+      const activeLat = currentData.lat ?? 11.00659;
+      const activeLng = currentData.lng ?? 77.01404;
+      const currentCoords = [activeLat, activeLng];
 
-        const vehicleIcon = L.divIcon({
-          className: 'map-veh-icon',
-          html: iconHtml,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17]
-        });
+      const markerColor = hasValidCoords ? '#06b6d4' : '#f59e0b';
+      const markerSymbol = hasValidCoords ? '🛰️' : '📡';
 
-        const popupContent = `
-          <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
-            <strong style="font-size: 13px; color: #0891b2;">🛰️ ${selectedVehicleId}</strong><br/>
-            <strong>Lat:</strong> ${currentData.lat?.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng?.toFixed(6)}<br/>
-            <strong>Speed:</strong> ${Math.round(currentData.speed || 0)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}<br/>
-            <strong>Altitude:</strong> ${currentData.altitude || 0}m
-          </div>
-        `;
+      const iconHtml = `<div style="
+        transform: rotate(${currentData.heading || 0}deg);
+        width: 34px;
+        height: 34px;
+        background-color: ${markerColor};
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 0 16px ${markerColor};
+        display:flex; align-items:center; justify-content:center;
+        font-size: 18px;
+      ">${markerSymbol}</div>`;
 
-        if (markerInstance.current) {
-          markerInstance.current.setLatLng(coords);
-          markerInstance.current.setIcon(vehicleIcon);
-          markerInstance.current.getPopup()?.setContent(popupContent);
-          mapInstance.current.panTo(coords);
-        } else {
-          markerInstance.current = L.marker(coords, { icon: vehicleIcon }).addTo(mapInstance.current);
-          markerInstance.current.bindPopup(popupContent).openPopup();
-          mapInstance.current.setView(coords, 16);
-        }
-      } else if (markerInstance.current) {
-        markerInstance.current.remove();
-        markerInstance.current = null;
+      const vehicleIcon = L.divIcon({
+        className: 'map-veh-icon',
+        html: iconHtml,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
+      });
+
+      const popupContent = `
+        <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
+          <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} ESP32 SIM A7670C Hardware</strong><br/>
+          <strong>Status:</strong> ${hasValidCoords ? '<span style="color:#10b981; font-weight:bold;">🟢 Live GPS Stream</span>' : '<span style="color:#f59e0b; font-weight:bold;">🟡 Online / Indoor Standby</span>'}<br/>
+          <strong>Lat:</strong> ${activeLat.toFixed(6)} | <strong>Lng:</strong> ${activeLng.toFixed(6)}<br/>
+          <strong>Speed:</strong> ${Math.round(currentData.speed || 0)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}
+        </div>
+      `;
+
+      if (markerInstance.current) {
+        markerInstance.current.setLatLng(currentCoords);
+        markerInstance.current.setIcon(vehicleIcon);
+        markerInstance.current.getPopup()?.setContent(popupContent);
+        mapInstance.current.panTo(currentCoords);
+      } else {
+        markerInstance.current = L.marker(currentCoords, { icon: vehicleIcon }).addTo(mapInstance.current);
+        markerInstance.current.bindPopup(popupContent).openPopup();
+        mapInstance.current.setView(currentCoords, hasValidCoords ? 16 : 14);
       }
     }
   }, [activeTab, selectedVehicleId, telemetry]);
