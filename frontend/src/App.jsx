@@ -554,23 +554,25 @@ export default function App() {
     fetchCharts(selectedVehicleId);
   }, [selectedVehicleId]);
 
-  // Render Leaflet Map (Multi-vehicle for Home, Focused for Tracking)
+  // Render Leaflet Map (Multi-vehicle for Home, Focused for Tracking) — Runs ONCE per tab/vehicle select
   useEffect(() => {
     if (activeTab !== 'home' && activeTab !== 'tracking') return;
     if (!mapRef.current) return;
 
+    let isMounted = true;
+
     import('leaflet').then((L) => {
+      if (!isMounted || !mapRef.current) return;
+
       // Clean up previous map instance to prevent binding to stale DOM nodes
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
         markerInstance.current = null;
-        routeLineRef.current = null;
         geofenceCircleRef.current = null;
       }
 
       if (activeTab === 'home') {
-        // Multi-vehicle fleet map overview (respecting statusFilter)
         const visibleVehicles = vehicles.filter(v => {
           const t = telemetry[v.id] || {};
           const perf = getPerformance(v.id);
@@ -585,13 +587,11 @@ export default function App() {
 
         const allCoords = visibleVehicles
           .map(v => telemetry[v.id])
-          .filter(t => t && t.lat && t.lng)
+          .filter(t => t && t.lat && t.lng && t.fix && t.isOnline !== false)
           .map(t => [t.lat, t.lng]);
 
-        if (allCoords.length === 0) return;
-
-        const defaultCenter = allCoords[0];
-        mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView(defaultCenter, 5);
+        const defaultCenter = allCoords.length > 0 ? allCoords[0] : [11.0, 77.0];
+        mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView(defaultCenter, allCoords.length > 0 ? 10 : 4);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           attribution: '&copy; OpenStreetMap'
@@ -606,7 +606,7 @@ export default function App() {
 
         visibleVehicles.forEach(v => {
           const t = telemetry[v.id];
-          if (!t) return;
+          if (!t || t.lat == null || t.lng == null || !t.fix || t.isOnline === false) return;
           const perf = getPerformance(v.id);
           const iconHtml = `<div style="
             width: 30px;
@@ -632,68 +632,55 @@ export default function App() {
               <strong style="font-size: 13px;">${v.name} (${v.id})</strong><br/>
               <span style="color: #64748b; font-size: 10px;">VIN: ${v.vin}</span><br/>
               <div style="margin-top: 4px; border-top: 1px solid #cbd5e1; padding-top: 4px;">
-                <strong>Speed:</strong> ${Math.round(t.speed)} km/h<br/>
-                <strong>Fuel:</strong> ${t.fuelLevel?.toFixed(1)}% | <strong>Battery:</strong> ${t.backupBatteryPercent}%<br/>
-                <strong>Status:</strong> <span style="color:${perf.color}; font-weight: bold;">${perf.label}</span><br/>
-                ${t.checkEngine ? `<span style="color:#ef4444; font-weight:bold;">Fault: ${t.checkEngineCode}</span><br/>` : ''}
+                <strong>Speed:</strong> ${Math.round(t.speed || 0)} km/h<br/>
+                <strong>Fuel:</strong> ${t.fuelLevel?.toFixed(1) || 0}% | <strong>Battery:</strong> ${t.backupBatteryPercent || 0}%<br/>
               </div>
             </div>
           `);
         });
 
       } else if (activeTab === 'tracking') {
-        // Focused single-vehicle map with CARTO Dark Matter high-resolution street view
-        if (!selectedVehicleId || !telemetry[selectedVehicleId]) return;
-        const currentData = telemetry[selectedVehicleId];
-        if (!currentData || currentData.lat == null || currentData.lng == null || !currentData.fix || currentData.isOnline === false || currentData.status === 'offline') {
-          return;
-        }
-        const coords = [currentData.lat, currentData.lng];
+        const currentData = telemetry[selectedVehicleId] || {};
+        const hasValidCoords = currentData.lat != null && currentData.lng != null && currentData.fix && currentData.isOnline !== false;
+        const initialCoords = hasValidCoords ? [currentData.lat, currentData.lng] : [11.0, 77.0];
 
-        mapInstance.current = L.map(mapRef.current, { zoomControl: false }).setView(coords, 16);
+        const map = L.map(mapRef.current, { zoomControl: false }).setView(initialCoords, hasValidCoords ? 16 : 5);
+        mapInstance.current = map;
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           attribution: '&copy; OpenStreetMap &copy; CARTO',
           maxZoom: 19
-        }).addTo(mapInstance.current);
+        }).addTo(map);
 
-        L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+        L.control.zoom({ position: 'topright' }).addTo(map);
 
-        const vehicleIcon = L.divIcon({
-          className: 'map-veh-icon',
-          html: `<div style="
-            transform: rotate(${currentData.heading || 0}deg);
-            width: 32px;
-            height: 32px;
-            background-color: #06b6d4;
-            border: 2px solid white;
-            border-radius: 50%;
-            position: relative;
-            box-shadow: 0 0 16px rgba(6,182,212,0.9);
-            display:flex; align-items:center; justify-content:center;
-            font-size: 16px;
-          ">🛰️</div>`,
-          iconSize: [32, 32]
-        });
+        if (hasValidCoords) {
+          const vehicleIcon = L.divIcon({
+            className: 'map-veh-icon',
+            html: `<div style="
+              transform: rotate(${currentData.heading || 0}deg);
+              width: 32px;
+              height: 32px;
+              background-color: #06b6d4;
+              border: 2px solid white;
+              border-radius: 50%;
+              position: relative;
+              box-shadow: 0 0 16px rgba(6,182,212,0.9);
+              display:flex; align-items:center; justify-content:center;
+              font-size: 16px;
+            ">🛰️</div>`,
+            iconSize: [32, 32]
+          });
 
-        markerInstance.current = L.marker(coords, { icon: vehicleIcon }).addTo(mapInstance.current);
-        markerInstance.current.bindPopup(`
-          <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
-            <strong style="font-size: 13px; color: #0891b2;">🛰️ ${selectedVehicleId}</strong><br/>
-            <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}<br/>
-            <strong>Speed:</strong> ${Math.round(currentData.speed)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}<br/>
-            <strong>Altitude:</strong> ${currentData.altitude || 0}m
-          </div>
-        `).openPopup();
-
-        const fence = geofences[selectedVehicleId];
-        if (fence) {
-          geofenceCircleRef.current = L.circle([fence.lat, fence.lng], {
-            radius: fence.radius,
-            color: 'rgba(16, 185, 129, 0.4)',
-            fillColor: 'rgba(16, 185, 129, 0.05)',
-            weight: 2
-          }).addTo(mapInstance.current);
+          markerInstance.current = L.marker(initialCoords, { icon: vehicleIcon }).addTo(map);
+          markerInstance.current.bindPopup(`
+            <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
+              <strong style="font-size: 13px; color: #0891b2;">🛰️ ${selectedVehicleId}</strong><br/>
+              <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}<br/>
+              <strong>Speed:</strong> ${Math.round(currentData.speed)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}<br/>
+              <strong>Altitude:</strong> ${currentData.altitude || 0}m
+            </div>
+          `).openPopup();
         }
       }
 
@@ -701,7 +688,61 @@ export default function App() {
         if (mapInstance.current) mapInstance.current.invalidateSize();
       }, 150);
     });
-  }, [activeTab, selectedVehicleId, vehicles, telemetry, routes, geofences]);
+
+    return () => {
+      isMounted = false;
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        markerInstance.current = null;
+        geofenceCircleRef.current = null;
+      }
+    };
+  }, [activeTab, selectedVehicleId]);
+
+  // Smooth Marker Position & View Update (Runs on live telemetry updates WITHOUT re-creating the map)
+  useEffect(() => {
+    if (activeTab !== 'tracking' || !mapInstance.current) return;
+    const currentData = telemetry[selectedVehicleId];
+    if (!currentData || currentData.lat == null || currentData.lng == null || !currentData.fix || currentData.isOnline === false || currentData.status === 'offline') {
+      if (markerInstance.current) {
+        markerInstance.current.remove();
+        markerInstance.current = null;
+      }
+      return;
+    }
+
+    const coords = [currentData.lat, currentData.lng];
+    import('leaflet').then((L) => {
+      if (!mapInstance.current) return;
+
+      const vehicleIcon = L.divIcon({
+        className: 'map-veh-icon',
+        html: `<div style="
+          transform: rotate(${currentData.heading || 0}deg);
+          width: 32px;
+          height: 32px;
+          background-color: #06b6d4;
+          border: 2px solid white;
+          border-radius: 50%;
+          position: relative;
+          box-shadow: 0 0 16px rgba(6,182,212,0.9);
+          display:flex; align-items:center; justify-content:center;
+          font-size: 16px;
+        ">🛰️</div>`,
+        iconSize: [32, 32]
+      });
+
+      if (markerInstance.current) {
+        markerInstance.current.setLatLng(coords);
+        markerInstance.current.setIcon(vehicleIcon);
+        mapInstance.current.panTo(coords);
+      } else {
+        markerInstance.current = L.marker(coords, { icon: vehicleIcon }).addTo(mapInstance.current);
+        mapInstance.current.setView(coords, 16);
+      }
+    });
+  }, [telemetry, selectedVehicleId, activeTab]);
 
   // Render Charts (Telemetry line history)
   useEffect(() => {
