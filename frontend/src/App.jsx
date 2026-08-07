@@ -1102,7 +1102,14 @@ export default function App() {
         <header className="topbar">
           <h2 className="page-title">
             {activeTab === 'home' && 'Dashboard Home'}
-            {activeTab === 'tracking' && 'Live Tracking'}
+            {activeTab === 'tracking' && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                Live Tracking
+                <span style={{ fontSize: '0.85rem', color: '#06b6d4', fontWeight: 700, backgroundColor: 'rgba(6, 182, 212, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(6, 182, 212, 0.4)' }}>
+                  📡 ESP32 SIM A7670C Tracker (gps-obd-tracker-01)
+                </span>
+              </span>
+            )}
             {activeTab === 'engine' && 'Engine Health'}
             {activeTab === 'fuel' && 'Fuel Monitoring'}
             {activeTab === 'battery' && 'Backup Battery Status'}
@@ -1550,10 +1557,30 @@ export default function App() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '1.25rem', height: '540px' }}>
                 <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px', minHeight: '540px', position: 'relative' }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '12px',
+                    left: '12px',
+                    zIndex: 1000,
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    border: '1px solid #06b6d4',
+                    color: '#06b6d4',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}>
+                    <span style={{ backgroundColor: '#10b981', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
+                    📡 Active Hardware Tracker: ESP32 SIM A7670C (gps-obd-tracker-01)
+                  </div>
                   <div ref={mapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
                 <div className="panel-container">
-                  <span className="panel-title"><Compass size={14} /> Live Tracking Details</span>
+                  <span className="panel-title"><Compass size={14} /> 📡 ESP32 SIM A7670C Tracker Details</span>
                   <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
