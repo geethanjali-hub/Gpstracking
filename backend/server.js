@@ -385,17 +385,31 @@ let localTelemetry = {
   }
 };
 
+app.get('/api/telemetry', (req, res) => {
+  res.json(localTelemetry);
+});
+
+app.get('/api/telemetry/:vehicleId', (req, res) => {
+  const vid = req.params.vehicleId;
+  res.json(localTelemetry[vid] || localTelemetry['gps-obd-tracker-01'] || {});
+});
+
 // 1. Receive Hardware Telemetry Payload (from ESP32 / SIM A7670C MQTT gateway)
 app.post('/api/telemetry', async (req, res) => {
   try {
     const payload = req.body;
     const vehicleId = payload.device_id || payload.vehicleId || 'gps-obd-tracker-01';
 
-    const hasFix = Boolean(payload.gps?.valid ?? payload.gps?.fix);
-    const rawLat = payload.gps?.lat ?? payload.lat;
-    const rawLng = payload.gps?.lng ?? payload.lng;
-    const lat = (hasFix && typeof rawLat === 'number' && rawLat !== 0) ? rawLat : null;
-    const lng = (hasFix && typeof rawLng === 'number' && rawLng !== 0) ? rawLng : null;
+    const rawLat = payload.gps?.lat ?? payload.location?.lat ?? payload.lat;
+    const rawLng = payload.gps?.lng ?? payload.location?.lng ?? payload.lng;
+    const hasValidCoords = typeof rawLat === 'number' && !isNaN(rawLat) && rawLat !== 0 &&
+                           typeof rawLng === 'number' && !isNaN(rawLng) && rawLng !== 0;
+
+    const fixFlag = payload.gps?.valid ?? payload.gps?.fix ?? payload.location?.fix ?? payload.fix;
+    const hasFix = (fixFlag !== false && fixFlag !== 0 && fixFlag !== "false") && hasValidCoords;
+
+    const lat = hasFix ? rawLat : null;
+    const lng = hasFix ? rawLng : null;
 
     // Format full hardware packet into standardized telematics state
     const telemetryDoc = {
@@ -599,13 +613,17 @@ mqttClient.on('message', async (topic, message) => {
     deviceLastSeen.set(vehicleId, now);
     deviceLastSeen.set('gps-obd-tracker-01', now);
 
-    const hasFix = Boolean(raw.location?.fix);
-    const rawLat = raw.location?.lat;
-    const rawLng = raw.location?.lng;
+    const rawLat = raw.location?.lat ?? raw.gps?.lat ?? raw.lat;
+    const rawLng = raw.location?.lng ?? raw.gps?.lng ?? raw.lng;
+    const hasValidCoords = typeof rawLat === 'number' && !isNaN(rawLat) && rawLat !== 0 &&
+                           typeof rawLng === 'number' && !isNaN(rawLng) && rawLng !== 0;
+
+    const fixFlag = raw.location?.fix ?? raw.gps?.fix ?? raw.gps?.valid ?? raw.fix;
+    const hasFix = (fixFlag !== false && fixFlag !== 0 && fixFlag !== "false") && hasValidCoords;
 
     // Use live coordinates ONLY if fix is valid and non-zero. NO fallback coordinates when fix is false or offline.
-    const lat = (hasFix && typeof rawLat === 'number' && rawLat !== 0) ? rawLat : null;
-    const lng = (hasFix && typeof rawLng === 'number' && rawLng !== 0) ? rawLng : null;
+    const lat = hasFix ? rawLat : null;
+    const lng = hasFix ? rawLng : null;
 
     // Map ESP32 MQTT JSON format -> standardized telemetry format
     const telemetryDoc = {
