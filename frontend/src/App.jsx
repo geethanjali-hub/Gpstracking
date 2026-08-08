@@ -41,24 +41,13 @@ export default function App() {
   const [currentArea, setCurrentArea] = useState({});
   const [currentStreet, setCurrentStreet] = useState({});
 
-  // Force reset legacy cached vehicle selections and reload on build update
+  // Clean up legacy URL parameters without forced page reloads
   useEffect(() => {
     if (window.location.search.includes('ver=')) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-    try {
-      const APP_BUILD_VER = '2026.08.07.HARDWARE_v12';
-      const storedVer = localStorage.getItem('app_build_version');
-      if (storedVer !== APP_BUILD_VER) {
-        localStorage.clear();
-        localStorage.setItem('app_build_version', APP_BUILD_VER);
-        if (storedVer) {
-          window.location.reload(true);
-          return;
-        }
-      }
-    } catch (e) {}
   }, []);
+
 
   // Reverse Geocoding Effect for Area & Street Name
   useEffect(() => {
@@ -614,25 +603,30 @@ export default function App() {
     let ws = null;
 
     try {
-      const backendHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'localhost'
-        : '64.227.179.37';
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const wsUrl = `${wsProtocol}://${backendHost}:3001`;
-      ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      const isHttps = window.location.protocol === 'https:';
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-      ws.onmessage = (event) => {
-        const payload = JSON.parse(event.data);
-        if (payload.type === 'TELEMETRY_UPDATE') {
-          if (payload.vehicleId && payload.data) {
-            applyTelemetryUpdate(payload.vehicleId, payload.data);
+      if (!isLocalhost && isHttps) {
+        console.log("ℹ️ HTTPS deployment detected: Telemetry streams dynamically via Firebase & HTTP polling.");
+      } else {
+        const backendHost = isLocalhost ? 'localhost' : '64.227.179.37';
+        const wsUrl = `ws://${backendHost}:3001`;
+        ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onmessage = (event) => {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'TELEMETRY_UPDATE') {
+            if (payload.vehicleId && payload.data) {
+              applyTelemetryUpdate(payload.vehicleId, payload.data);
+            }
           }
-        }
-      };
+        };
+      }
     } catch (e) {
       console.warn("WebSocket failed to initialize:", e.message);
     }
+
 
     fetchVehicles();
 

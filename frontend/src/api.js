@@ -2,10 +2,10 @@
  * Enterprise API & Authentication Client with JWT, Refresh Tokens & OAuth 2.0
  */
 
-const API_HOST = '64.227.179.37:3001';
-const API_BASE = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-  ? 'http://localhost:3001'
-  : `${window.location.protocol === 'https:' ? 'https' : 'http'}://${API_HOST}`;
+const API_BASE = (typeof window !== 'undefined')
+  ? (window.location.port === '3000' || window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin)
+  : 'http://localhost:3001';
+
 
 // Token Storage Keys
 const ACCESS_TOKEN_KEY = 'ibots_access_token';
