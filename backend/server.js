@@ -819,7 +819,8 @@ mqttClient.on('message', async (topic, message) => {
       ? topicParts[1] 
       : topic.replace(/\//g, '_');
       
-    const vehicleId = deviceFromTopic || 'gps-obd-tracker-01';
+    const vehicleId = deviceFromTopic || topic.replace(/\//g, '_');
+
 
     // Track device liveness timestamp strictly by topic & vehicleId
     const now = Date.now();
