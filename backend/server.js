@@ -193,15 +193,16 @@ const DB_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vehicle
 const defaultVehicles = [
   {
     id: 'gps-obd-tracker-01',
-    name: 'ESP32 SIM A7670C Hardware Tracker',
+    name: 'gps v2',
     userName: 'System Administrator',
     vin: 'OBD_TRK_001',
-    status: 'online',
+    status: 'offline',
     topic: 'sedhupathi/gps-obd-tracker-01/data',
     broker: 'mqtt://test.mosquitto.org:1883',
     createdAt: new Date().toISOString()
   }
 ];
+
 
 function loadDatabase() {
   try {
@@ -921,12 +922,20 @@ setInterval(() => {
           ...existingDoc,
           isOnline: false,
           status: 'offline',
+          lat: null,
+          lng: null,
+          address: 'Offline',
+          street: 'Offline',
+          road: 'Offline',
+          area: 'Offline',
+          suburb: 'Offline',
           speed: 0,
           rpm: 0,
           satellites: 0,
           lastSeen: new Date(lastSeen).toISOString(),
           offlineNotice: 'DEVICE POWERED OFF / DISCONNECTED'
         };
+
 
         if (existingDoc.topic) {
           localTelemetryByTopic[existingDoc.topic] = offlineDoc;

@@ -1,7 +1,8 @@
 [
   {
     "id": "gps-obd-tracker-01",
-    "name": "ESP32 SIM A7670C Hardware Tracker",
+    "name": "gps v2",
+
     "userName": "Test driver 1",
     "vin": "OBD_TRK_8750",
     "status": "offline",

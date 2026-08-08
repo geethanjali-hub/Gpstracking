@@ -60,22 +60,23 @@ export default function App() {
     } catch (e) {}
   }, []);
 
-  // Reverse Geocoding Effect using OpenStreetMap Nominatim for Area & Street Name
+  // Reverse Geocoding Effect for Area & Street Name
   useEffect(() => {
     if (!selectedVehicleId) return;
     const t = telemetry[selectedVehicleId] || {};
-    if (t.address && t.street) {
+    if (!t.isOnline || t.status === 'offline' || !t.lat || !t.lng) {
+      setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: 'Offline' }));
+      setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: 'Offline' }));
+      setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: 'Offline' }));
+      return;
+    }
+    if (t.address && t.street && t.address !== 'Offline') {
       setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: t.street }));
       setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: t.area || t.suburb || 'Live Area' }));
       setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: t.address }));
       return;
     }
-    if (!t.lat || !t.lng) {
-      setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
-      setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
-      setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
-      return;
-    }
+
 
     const lat = t.lat;
     const lng = t.lng;
@@ -298,8 +299,12 @@ export default function App() {
     try {
       const res = await fetch('/api/vehicles');
       if (res.ok) {
-        const data = await res.json();
+        let data = await res.json();
         if (Array.isArray(data)) {
+          data = data.map(v => ({
+            ...v,
+            name: (v.name && v.name.includes('ESP32')) ? 'Gps v2' : (v.name || 'Gps v2')
+          }));
           setVehicles(data);
           if (data.length > 0) {
             setSelectedVehicleId(prev => (prev && data.some(v => v.id === prev)) ? prev : data[0].id);
@@ -308,6 +313,7 @@ export default function App() {
           }
           return;
         }
+
       }
     } catch (err) {
       console.warn("Failed to fetch vehicles from server DB:", err);
@@ -709,12 +715,12 @@ export default function App() {
 
         const popupContent = `
           <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
-            <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} ESP32 SIM A7670C Hardware</strong><br/>
+            <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} Gps v2</strong><br/>
             <strong>Status:</strong> <span style="color:#10b981; font-weight:bold;">🟢 Live GPS Stream</span><br/>
-            <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}<br/>
-            <strong>Speed:</strong> ${Math.round(currentData.speed || 0)} km/h | <strong>Sats:</strong> ${currentData.satellites || 0}
+            <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}
           </div>
         `;
+
 
         if (markerRef.current) {
           // Update position smoothly without tile reset
@@ -1690,28 +1696,8 @@ export default function App() {
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Satellite Count</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.satellites || 0} Satellites</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Altitude</span>
                   <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.altitude || 0} m</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Speed Overlay</span>
-                  <strong style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>{Math.round(currentData.speed || 0)} km/h</strong>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Average Speed</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.avgSpeed || 0} km/h</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Maximum Speed</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-orange)' }}>{currentData.maxSpeed || 0} km/h</span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
@@ -1732,23 +1718,24 @@ export default function App() {
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentStreet[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentStreet[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentArea[selectedVehicleId] || (currentData.lat ? 'Live Location' : 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentArea[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address & PIN</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentAddress[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentAddress[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
+
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Assigned Fixed Route Overlay</span>
