@@ -2,8 +2,8 @@
   {
     "id": "gps-obd-tracker-01",
     "name": "ESP32 SIM A7670C Hardware Tracker",
-    "userName": "Test Driver1",
-    "vin": "OBD_TRK_6466",
+    "userName": "Test driver 1",
+    "vin": "OBD_TRK_8750",
     "status": "offline",
     "topic": "sedhupathi/gps-obd-tracker-01/data",
     "broker": "mqtt://test.mosquitto.org:1883",
@@ -15,6 +15,6 @@
       "maxTemp": 105,
       "minFuel": 15
     },
-    "createdAt": "2026-08-08T08:32:18.520Z"
+    "createdAt": "2026-08-08T10:08:41.934Z"
   }
 ]

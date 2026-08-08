@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
+    "build": "cd frontend && npm install && npm run build && node -e \"import fs from 'fs'; fs.cpSync('dist', '../dist', { recursive: true }); fs.cpSync('dist', '../public', { recursive: true });\"",
     "start": "node backend/server.js"
   }
 }
