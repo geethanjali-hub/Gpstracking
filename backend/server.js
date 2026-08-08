@@ -752,8 +752,13 @@ app.delete('/api/vehicles/:id', async (req, res) => {
     broadcast({ type: 'VEHICLE_DELETED', vehicleId: id });
     res.json({ status: 'ok', message: `Device ${id} deleted successfully from Firebase Firestore` });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 5. Delete All Telemetry Data across all vehicles from Firebase DB
 app.delete('/api/telemetry', async (req, res) => {
+
   try {
     localTelemetry = {};
     localTelemetryByTopic = {};
