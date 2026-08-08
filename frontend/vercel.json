@@ -1,5 +1,6 @@
 {
-  "buildCommand": "npm run build",
+  "framework": "vite",
+  "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
   "headers": [
     {
