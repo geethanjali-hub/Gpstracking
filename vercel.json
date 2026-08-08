@@ -1,7 +1,7 @@
 {
-  "framework": "vite",
-  "buildCommand": "cd frontend && npm install && npm run build || npm run build",
+  "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/(.*)",
