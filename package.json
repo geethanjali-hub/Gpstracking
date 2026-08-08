@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd frontend && npm install && npx vite build --base=/ && node -e \"import fs from 'fs'; fs.mkdirSync('../dist/assets', { recursive: true }); fs.cpSync('dist', '../dist', { recursive: true }); const files = fs.readdirSync('dist/assets'); const jsFile = files.find(f => f.endsWith('.js') && !f.includes('leaflet')); const cssFile = files.find(f => f.endsWith('.css')); if (jsFile) { fs.copyFileSync('dist/assets/' + jsFile, '../dist/assets/index-TfEAfUYD.js'); fs.copyFileSync('dist/assets/' + jsFile, 'dist/assets/index-TfEAfUYD.js'); } if (cssFile) { fs.copyFileSync('dist/assets/' + cssFile, '../dist/assets/index-BihvoZDh.css'); fs.copyFileSync('dist/assets/' + cssFile, 'dist/assets/index-BihvoZDh.css'); }\"",
+    "build": "cd frontend && npm install && npm run build",
     "start": "node backend/server.js"
   }
 }
