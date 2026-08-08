@@ -426,14 +426,34 @@ let localTelemetry = {
   }
 };
 
+let localTelemetryByTopic = {};
+
 app.get('/api/telemetry', (req, res) => {
+  const queryTopic = req.query.topic;
+  if (queryTopic) {
+    const data = localTelemetryByTopic[queryTopic] || Object.values(localTelemetry).find(t => t.topic === queryTopic);
+    return res.json(data || { error: 'No telemetry found for specified topic', topic: queryTopic });
+  }
   res.json(localTelemetry);
+});
+
+app.get('/api/telemetry/by-topic', (req, res) => {
+  const topicName = req.query.name;
+  if (!topicName) {
+    return res.status(400).json({ error: 'Query parameter "name" (topic name) is required' });
+  }
+  const telemetry = localTelemetryByTopic[topicName] || Object.values(localTelemetry).find(t => t.topic === topicName);
+  if (!telemetry) {
+    return res.status(404).json({ error: 'No location data found for topic', topic: topicName });
+  }
+  res.json(telemetry);
 });
 
 app.get('/api/telemetry/:vehicleId', (req, res) => {
   const vid = req.params.vehicleId;
-  res.json(localTelemetry[vid] || localTelemetry['gps-obd-tracker-01'] || {});
+  res.json(localTelemetry[vid] || localTelemetryByTopic[vid] || localTelemetry['gps-obd-tracker-01'] || {});
 });
+
 
 // 1. Receive Hardware Telemetry Payload (from ESP32 / SIM A7670C MQTT gateway)
 app.post('/api/telemetry', async (req, res) => {
@@ -708,20 +728,23 @@ mqttClient.on('reconnect', () => {
   console.log('📡 MQTT: Reconnecting...');
 });
 
-// Process incoming MQTT messages from ESP32 hardware
+// Process incoming MQTT messages from ESP32 hardware (extracts location based on topic name alone)
 mqttClient.on('message', async (topic, message) => {
   try {
     const raw = JSON.parse(message.toString());
-    console.log(`📡 MQTT: Received from ${topic}`);
+    console.log(`📡 MQTT: Received from topic [${topic}]`);
 
-    // Extract device ID from topic: sedhupathi/gps-obd-tracker-01/data -> gps-obd-tracker-01
+    // Extract device/tracker name strictly from topic path: e.g. "sedhupathi/tracker-01/data" -> "tracker-01"
     const topicParts = topic.split('/');
-    const vehicleId = (topicParts.length >= 2 && topicParts[1] !== '+') 
+    const deviceFromTopic = (topicParts.length >= 2 && topicParts[1] !== '+') 
       ? topicParts[1] 
-      : (raw.device_id || 'gps-obd-tracker-01');
+      : topic.replace(/\//g, '_');
+      
+    const vehicleId = deviceFromTopic || 'gps-obd-tracker-01';
 
-    // Track device liveness timestamp
+    // Track device liveness timestamp by topic & vehicleId
     const now = Date.now();
+    deviceLastSeen.set(topic, now);
     deviceLastSeen.set(vehicleId, now);
     deviceLastSeen.set('gps-obd-tracker-01', now);
 
@@ -733,57 +756,42 @@ mqttClient.on('message', async (topic, message) => {
     const fixFlag = raw.location?.fix ?? raw.gps?.fix ?? raw.gps?.valid ?? raw.fix;
     const hasFix = Boolean(fixFlag) || hasValidCoords;
 
-    // Use live coordinates whenever valid numbers are transmitted by hardware (GPS, LBS Cell tower, or last known position)
     const lat = hasValidCoords ? rawLat : null;
     const lng = hasValidCoords ? rawLng : null;
 
-    // Map ESP32 MQTT JSON format -> standardized telemetry format
+    // Standardized telemetry state built directly from topic + location payload
     const telemetryDoc = {
+      topic,
+      topicDevice: deviceFromTopic,
       vehicleId,
       source: 'mqtt_live',
       isOnline: true,
       status: 'online',
 
-      // GPS (from ESP32 location object)
+      // Location coordinates parsed from payload
       gpsValid: hasFix,
       fix: hasFix,
       lat,
       lng,
-      altitude: raw.location?.altitude_m ?? 0,
-      speed: raw.location?.speed_kph ?? 0,
-      heading: raw.location?.heading_deg ?? 0,
-      satellites: raw.location?.satellites ?? 0,
-      hdop: raw.location?.hdop ?? 0,
+      altitude: raw.location?.altitude_m ?? raw.alt ?? 0,
+      speed: raw.location?.speed_kph ?? raw.speed ?? raw.spd ?? 0,
+      heading: raw.location?.heading_deg ?? raw.heading ?? raw.hdg ?? 0,
+      satellites: raw.location?.satellites ?? raw.sats ?? 0,
+      hdop: raw.location?.hdop ?? raw.hdop ?? 0,
       accuracy: raw.location?.hdop ?? 2.5,
-      gpsSource: raw.location?.source ?? 'no_fix',
 
-      // Engine / OBD (from ESP32 engine object — currently simulated)
-      rpm: raw.engine?.rpm ?? 0,
-      coolantTemp: raw.engine?.coolant_temp_c ?? 0,
-      engineLoad: raw.engine?.engine_load_pct ?? 0,
-      engineLoadPct: raw.engine?.engine_load_pct ?? 0,
-      throttle: raw.engine?.throttle_pct ?? 0,
-      throttlePct: raw.engine?.throttle_pct ?? 0,
-      checkEngine: raw.engine?.check_engine ?? false,
-      obdSource: raw.engine?.source ?? 'simulated',
-
-      // Fuel (from ESP32 fuel object — currently simulated)
-      fuelLevel: raw.fuel?.fuel_level_pct ?? 0,
-      fuelConsumption: raw.fuel?.fuel_consumption_lph ?? 0,
-      fuelConsumptionLph: raw.fuel?.fuel_consumption_lph ?? 0,
-      fuelSource: raw.fuel?.source ?? 'simulated',
-
-      // Battery (from ESP32 battery object)
-      backupBatteryPercent: raw.battery?.battery_pct ?? 0,
-      backupBatteryVoltage: raw.battery?.battery_voltage ?? 0,
-      powerSource: raw.battery?.power_source ?? 'vehicle',
-      isCharging: raw.battery?.charging ?? false,
-      chargingStatus: raw.battery?.charging ? 'charging' : 'discharging',
+      // OBD & Diagnostics Data (if provided in payload)
+      rpm: raw.engine?.rpm ?? raw.rpm ?? 0,
+      coolantTemp: raw.engine?.coolant_temp_c ?? raw.coolant_c ?? 0,
+      fuelLevel: raw.fuel?.fuel_level_pct ?? raw.fuel_pct ?? 0,
+      backupBatteryPercent: raw.battery?.battery_pct ?? raw.bat_pct ?? 100,
 
       timestamp: new Date().toISOString()
     };
 
-    // Save to Firebase RTDB & Firestore for vehicleId
+    // Store in topic lookup dictionary & vehicle lookup dictionary
+    localTelemetryByTopic[topic] = telemetryDoc;
+
     const vehicleIdsToUpdate = Array.from(new Set([vehicleId, 'gps-obd-tracker-01']));
     for (const vId of vehicleIdsToUpdate) {
       const vDoc = { ...telemetryDoc, vehicleId: vId };
@@ -798,14 +806,15 @@ mqttClient.on('message', async (topic, message) => {
         console.warn(`Firebase save from MQTT for ${vId} warning:`, fbErr.message);
       }
       localTelemetry[vId] = vDoc;
-      broadcast({ type: 'TELEMETRY_UPDATE', vehicleId: vId, data: vDoc });
+      broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId: vId, data: vDoc });
     }
-    console.log(`✅ MQTT->Firebase: Saved live data for ${vehicleId} (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
+    console.log(`✅ MQTT Topic [${topic}]: Saved location (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
 
   } catch (parseErr) {
-    console.warn('📡 MQTT: Failed to parse message from', topic, parseErr.message);
+    console.warn('📡 MQTT: Failed to parse message from topic', topic, parseErr.message);
   }
 });
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HARDWARE LIVENESS & OFFLINE DETECTION MONITOR

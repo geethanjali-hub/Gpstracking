@@ -1,0 +1,1 @@
+cd /home/geetha/gps_project && git fetch origin main && git reset --hard origin/main && cd frontend && npm install && npm run build && cd ../backend && npm install && pm2 delete all && pm2 start server.js --name gps-backend && pm2 save
