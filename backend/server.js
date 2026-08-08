@@ -820,11 +820,10 @@ mqttClient.on('message', async (topic, message) => {
       
     const vehicleId = deviceFromTopic || 'gps-obd-tracker-01';
 
-    // Track device liveness timestamp by topic & vehicleId
+    // Track device liveness timestamp strictly by topic & vehicleId
     const now = Date.now();
     deviceLastSeen.set(topic, now);
     deviceLastSeen.set(vehicleId, now);
-    deviceLastSeen.set('gps-obd-tracker-01', now);
 
     const rawLat = raw.location?.lat ?? raw.gps?.lat ?? raw.lat;
     const rawLng = raw.location?.lng ?? raw.gps?.lng ?? raw.lng;
@@ -879,26 +878,22 @@ mqttClient.on('message', async (topic, message) => {
       timestamp: new Date().toISOString()
     };
 
-
     // Store in topic lookup dictionary & vehicle lookup dictionary
     localTelemetryByTopic[topic] = telemetryDoc;
+    localTelemetry[vehicleId] = telemetryDoc;
 
-    const vehicleIdsToUpdate = Array.from(new Set([vehicleId, 'gps-obd-tracker-01']));
-    for (const vId of vehicleIdsToUpdate) {
-      const vDoc = { ...telemetryDoc, vehicleId: vId };
-      try {
-        if (rtdb) {
-          await set(ref(rtdb, 'telemetry/' + vId), vDoc);
-        }
-        if (db) {
-          await setDoc(doc(db, 'telemetry', vId), vDoc, { merge: true });
-        }
-      } catch (fbErr) {
-        console.warn(`Firebase save from MQTT for ${vId} warning:`, fbErr.message);
+    try {
+      if (rtdb) {
+        await set(ref(rtdb, 'telemetry/' + vehicleId), telemetryDoc);
       }
-      localTelemetry[vId] = vDoc;
-      broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId: vId, data: vDoc });
+      if (db) {
+        await setDoc(doc(db, 'telemetry', vehicleId), telemetryDoc, { merge: true });
+      }
+    } catch (fbErr) {
+      console.warn(`Firebase save from MQTT for ${vehicleId} warning:`, fbErr.message);
     }
+    
+    broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId, data: telemetryDoc });
     console.log(`✅ MQTT Topic [${topic}]: Saved location (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
 
   } catch (parseErr) {
@@ -909,10 +904,10 @@ mqttClient.on('message', async (topic, message) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HARDWARE LIVENESS & OFFLINE DETECTION MONITOR
-// Runs every 5 seconds — automatically detects if ESP32 device is powered off
+// Runs every 4 seconds — marks device offline if no packet for > 20s
 // ═══════════════════════════════════════════════════════════════════════════
 const deviceLastSeen = new Map();
-const OFFLINE_TIMEOUT_MS = 45000; // Mark device offline if no packet for > 45s (prevents flickering)
+const OFFLINE_TIMEOUT_MS = 20000; // Mark device offline if no packet for > 20s
 
 setInterval(() => {
   const now = Date.now();
@@ -920,7 +915,7 @@ setInterval(() => {
     if (now - lastSeen > OFFLINE_TIMEOUT_MS) {
       const existingDoc = localTelemetryByTopic[vId] || localTelemetry[vId];
       if (existingDoc && existingDoc.isOnline !== false) {
-        console.log(`⚠️ Heartbeat Alert: Hardware device/topic ${vId} went OFFLINE (No MQTT packet for >45s)`);
+        console.log(`⚠️ Heartbeat Alert: Hardware device/topic ${vId} went OFFLINE (No MQTT packet for >20s)`);
         
         const offlineDoc = {
           ...existingDoc,
@@ -938,6 +933,7 @@ setInterval(() => {
         }
         localTelemetry[vId] = offlineDoc;
         broadcast({ type: 'TELEMETRY_UPDATE', vehicleId: vId, data: offlineDoc });
+
 
         if (rtdb) {
           set(ref(rtdb, 'telemetry/' + vId), offlineDoc).catch(() => {});
