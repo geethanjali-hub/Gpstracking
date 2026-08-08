@@ -752,9 +752,34 @@ app.delete('/api/vehicles/:id', async (req, res) => {
     broadcast({ type: 'VEHICLE_DELETED', vehicleId: id });
     res.json({ status: 'ok', message: `Device ${id} deleted successfully from Firebase Firestore` });
   } catch (err) {
+// 5. Delete All Telemetry Data across all vehicles from Firebase DB
+app.delete('/api/telemetry', async (req, res) => {
+  try {
+    localTelemetry = {};
+    localTelemetryByTopic = {};
+
+    try {
+      if (rtdb) {
+        await set(ref(rtdb, 'telemetry'), null);
+      }
+      if (db) {
+        const snapshot = await getDocs(collection(db, 'telemetry'));
+        for (const docSnap of snapshot.docs) {
+          await deleteDoc(doc(db, 'telemetry', docSnap.id));
+        }
+      }
+      console.log('🗑️ Deleted all vehicle telemetry data from Firebase DB (ibots-gps)');
+    } catch (fbErr) {
+      console.warn('⚠️ Firebase telemetry delete warning:', fbErr.message);
+    }
+
+    broadcast({ type: 'ALL_TELEMETRY_CLEARED' });
+    res.json({ status: 'ok', message: 'All vehicle telemetry data deleted successfully from Firebase DB' });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 
