@@ -43,8 +43,11 @@ export default function App() {
 
   // Force reset legacy cached vehicle selections and reload on build update
   useEffect(() => {
+    if (window.location.search.includes('ver=')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
     try {
-      const APP_BUILD_VER = '2026.08.07.HARDWARE_v11';
+      const APP_BUILD_VER = '2026.08.07.HARDWARE_v12';
       const storedVer = localStorage.getItem('app_build_version');
       if (storedVer !== APP_BUILD_VER) {
         localStorage.clear();
