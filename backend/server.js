@@ -635,20 +635,17 @@ app.get('/api/vehicles', async (req, res) => {
   try {
     if (db) {
       const querySnapshot = await getDocs(collection(db, 'vehicles'));
-      if (!querySnapshot.empty) {
-        const fbVehicles = [];
-        querySnapshot.forEach(docSnap => fbVehicles.push(docSnap.data()));
-        if (fbVehicles.length > 0) {
-          localVehicles = fbVehicles;
-          return res.json(fbVehicles);
-        }
-      }
+      const fbVehicles = [];
+      querySnapshot.forEach(docSnap => fbVehicles.push(docSnap.data()));
+      localVehicles = fbVehicles;
+      return res.json(fbVehicles); // Returns [] when deleted from Firestore!
     }
   } catch (fbErr) {
     console.warn("⚠️ Firebase Firestore fetch warning:", fbErr.message);
   }
   res.json(localVehicles);
 });
+
 
 // 3. Register New Vehicle & Map Device / MQTT Topic / Broker directly in Firebase Firestore
 app.post('/api/vehicles', async (req, res) => {
