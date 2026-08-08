@@ -64,12 +64,19 @@ export default function App() {
   useEffect(() => {
     if (!selectedVehicleId) return;
     const t = telemetry[selectedVehicleId] || {};
+    if (t.address && t.street) {
+      setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: t.street }));
+      setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: t.area || t.suburb || 'Live Area' }));
+      setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: t.address }));
+      return;
+    }
     if (!t.lat || !t.lng) {
       setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
       setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
       setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
       return;
     }
+
     const lat = t.lat;
     const lng = t.lng;
     const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;

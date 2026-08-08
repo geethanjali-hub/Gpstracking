@@ -427,6 +427,72 @@ let localTelemetry = {
 };
 
 let localTelemetryByTopic = {};
+const addressCache = new Map();
+
+// Helper: Reverse Geocode (lat, lng) -> Road, Area, City, State, Full Address
+async function getAddressFromCoords(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+    return {
+      address: "Awaiting Live GPS Signal...",
+      street: "Unknown Road",
+      road: "Unknown Road",
+      area: "Unknown Area",
+      suburb: "Unknown Area",
+      city: "",
+      state: "",
+      postcode: ""
+    };
+  }
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  if (addressCache.has(key)) {
+    return addressCache.get(key);
+  }
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'IBOTS-GPS-Tracking/1.0 (admin@ibots.academy)' }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const a = data.address || {};
+      const street = a.road || a.pedestrian || a.footway || a.street || a.highway || a.building || a.amenity || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      const area = a.suburb || a.neighbourhood || a.quarter || a.residential || a.city_district || a.locality || a.village || a.town || 'Live Area';
+      const city = a.city || a.town || a.county || a.state_district || '';
+      const state = a.state || '';
+      const postcode = a.postcode ? `PIN: ${a.postcode}` : '';
+      const fullAddress = data.display_name || [street, area, city, state, postcode].filter(Boolean).join(', ');
+
+      const result = {
+        address: fullAddress,
+        street: street,
+        road: street,
+        area: area,
+        suburb: area,
+        city: city,
+        state: state,
+        postcode: a.postcode || ''
+      };
+      addressCache.set(key, result);
+      return result;
+    }
+  } catch (err) {
+    console.warn('⚠️ Reverse geocoding fetch warning:', err.message);
+  }
+
+  const fallback = {
+    address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    street: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    road: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    area: 'Live Coordinates',
+    suburb: 'Live Coordinates',
+    city: '',
+    state: '',
+    postcode: ''
+  };
+  return fallback;
+}
+
 
 app.get('/api/telemetry', (req, res) => {
   const queryTopic = req.query.topic;
@@ -472,6 +538,8 @@ app.post('/api/telemetry', async (req, res) => {
     const lat = hasValidCoords ? rawLat : null;
     const lng = hasValidCoords ? rawLng : null;
 
+    const addressDetails = await getAddressFromCoords(lat, lng);
+
     // Format full hardware packet into standardized telematics state
     const telemetryDoc = {
       vehicleId,
@@ -486,12 +554,22 @@ app.post('/api/telemetry', async (req, res) => {
       fix: hasFix,
       lat,
       lng,
+      address: addressDetails.address,
+      street: addressDetails.street,
+      road: addressDetails.road,
+      area: addressDetails.area,
+      suburb: addressDetails.suburb,
+      city: addressDetails.city,
+      state: addressDetails.state,
+      postcode: addressDetails.postcode,
+
       altitude: payload.gps?.alt ?? 0,
       speed: payload.gps?.spd ?? payload.speed ?? 0,
       heading: payload.gps?.hdg ?? payload.heading ?? 0,
       satellites: payload.gps?.sats ?? 0,
       hdop: payload.gps?.hdop ?? 0,
       fixAgeMs: payload.gps?.fix_age_ms ?? 0,
+
 
       // OBD-II Diagnostics Data
       obdConnected: payload.obd?.connected ?? true,
@@ -759,6 +837,9 @@ mqttClient.on('message', async (topic, message) => {
     const lat = hasValidCoords ? rawLat : null;
     const lng = hasValidCoords ? rawLng : null;
 
+    // Resolve full reverse geocoded address including street name, road name, area name, city, state
+    const addressDetails = await getAddressFromCoords(lat, lng);
+
     // Standardized telemetry state built directly from topic + location payload
     const telemetryDoc = {
       topic,
@@ -768,11 +849,20 @@ mqttClient.on('message', async (topic, message) => {
       isOnline: true,
       status: 'online',
 
-      // Location coordinates parsed from payload
+      // Location coordinates & reverse-geocoded street/area details
       gpsValid: hasFix,
       fix: hasFix,
       lat,
       lng,
+      address: addressDetails.address,
+      street: addressDetails.street,
+      road: addressDetails.road,
+      area: addressDetails.area,
+      suburb: addressDetails.suburb,
+      city: addressDetails.city,
+      state: addressDetails.state,
+      postcode: addressDetails.postcode,
+
       altitude: raw.location?.altitude_m ?? raw.alt ?? 0,
       speed: raw.location?.speed_kph ?? raw.speed ?? raw.spd ?? 0,
       heading: raw.location?.heading_deg ?? raw.heading ?? raw.hdg ?? 0,
@@ -788,6 +878,7 @@ mqttClient.on('message', async (topic, message) => {
 
       timestamp: new Date().toISOString()
     };
+
 
     // Store in topic lookup dictionary & vehicle lookup dictionary
     localTelemetryByTopic[topic] = telemetryDoc;
