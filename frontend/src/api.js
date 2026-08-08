@@ -2,10 +2,12 @@
  * Enterprise API & Authentication Client with JWT, Refresh Tokens & OAuth 2.0
  */
 
-const API_HOST = '64.227.179.37:3001';
-const API_BASE = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-  ? 'http://localhost:3001'
-  : `${window.location.protocol === 'https:' ? 'https' : 'http'}://${API_HOST}`;
+const API_BASE = typeof window !== 'undefined'
+  ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3001'
+    : window.location.origin
+  : 'http://localhost:3001';
+
 
 // Token Storage Keys
 const ACCESS_TOKEN_KEY = 'ibots_access_token';
@@ -48,6 +50,7 @@ export async function login(username, password) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ username, password })
   });
 
@@ -67,6 +70,7 @@ export async function loginWithGoogle(email, name, googleId) {
   const res = await fetch(`${API_BASE}/api/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ email, name, googleId })
   });
 
@@ -90,6 +94,7 @@ export async function refreshAccessToken() {
     const res = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ refreshToken: rToken })
     });
 
@@ -108,6 +113,28 @@ export async function refreshAccessToken() {
 }
 
 /**
+ * Check & Validate Auth Session with Backend JWT Endpoint (/api/auth/me)
+ */
+export async function verifyAuthSession() {
+  const token = getAccessToken();
+  if (!token) {
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) return null;
+  }
+  try {
+    const res = await authFetch('/api/auth/me');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.user) {
+        setSession(getAccessToken(), getRefreshToken(), data.user);
+        return data.user;
+      }
+    }
+  } catch (e) {}
+  return getUserProfile();
+}
+
+/**
  * Logout User & Revoke Tokens
  */
 export async function logout() {
@@ -116,6 +143,7 @@ export async function logout() {
     await fetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ refreshToken: rToken })
     });
   } catch (err) {
@@ -141,7 +169,7 @@ export async function authFetch(url, options = {}) {
   }
 
   const reqUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
-  let response = await fetch(reqUrl, { ...options, headers });
+  let response = await fetch(reqUrl, { ...options, headers, credentials: 'include' });
 
   // Handle Token Expiry (401 Unauthorized) with Silent Automatic Refresh
   if (response.status === 401 && getRefreshToken()) {
@@ -149,9 +177,10 @@ export async function authFetch(url, options = {}) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;
-      response = await fetch(reqUrl, { ...options, headers });
+      response = await fetch(reqUrl, { ...options, headers, credentials: 'include' });
     }
   }
 
   return response;
 }
+
