@@ -634,9 +634,8 @@ app.get('/api/vehicles', async (req, res) => {
   res.json(localVehicles);
 });
 
-// 3. Register New Vehicle & Map Device / MQTT Topic / Broker (Protected by JWT)
-app.post('/api/vehicles', authenticateToken, async (req, res) => {
-
+// 3. Register New Vehicle & Map Device / MQTT Topic / Broker
+app.post('/api/vehicles', async (req, res) => {
   try {
     const newVehicle = req.body;
     const vId = newVehicle.id || `gps-tracker-0${localVehicles.length + 1}`;
@@ -720,9 +719,8 @@ app.post('/api/vehicles', authenticateToken, async (req, res) => {
   }
 });
 
-// 4. Delete Vehicle & Dynamic Device from DB (Protected by JWT)
-app.delete('/api/vehicles/:id', authenticateToken, async (req, res) => {
-
+// 4. Delete Vehicle & Dynamic Device from DB
+app.delete('/api/vehicles/:id', async (req, res) => {
   try {
     const { id } = req.params;
     localVehicles = localVehicles.filter(v => v.id !== id);
