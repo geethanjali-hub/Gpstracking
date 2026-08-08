@@ -630,20 +630,9 @@ app.post('/api/telemetry', async (req, res) => {
   }
 });
 
-// 2. Fetch Fleet Vehicles — Reads directly from Firebase DB (RTDB & Firestore)
+// 2. Fetch Fleet Vehicles — Reads directly from Firebase Firestore Cloud Database ('vehicles')
 app.get('/api/vehicles', async (req, res) => {
   try {
-    if (rtdb) {
-      const snapshot = await get(ref(rtdb, 'vehicles'));
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        const fbVehicles = Array.isArray(val) ? val : Object.values(val);
-        if (fbVehicles.length > 0) {
-          localVehicles = fbVehicles;
-          return res.json(fbVehicles);
-        }
-      }
-    }
     if (db) {
       const querySnapshot = await getDocs(collection(db, 'vehicles'));
       if (!querySnapshot.empty) {
@@ -656,12 +645,12 @@ app.get('/api/vehicles', async (req, res) => {
       }
     }
   } catch (fbErr) {
-    console.warn("⚠️ Firebase DB fetch warning:", fbErr.message);
+    console.warn("⚠️ Firebase Firestore fetch warning:", fbErr.message);
   }
   res.json(localVehicles);
 });
 
-// 3. Register New Vehicle & Map Device / MQTT Topic / Broker directly in Firebase DB
+// 3. Register New Vehicle & Map Device / MQTT Topic / Broker directly in Firebase Firestore
 app.post('/api/vehicles', async (req, res) => {
   try {
     const newVehicle = req.body;
@@ -694,17 +683,14 @@ app.post('/api/vehicles', async (req, res) => {
       localVehicles.push(vehicleData);
     }
 
-    // Write directly to Firebase DB (RTDB & Firestore) as primary database
+    // Write directly to Firebase Firestore Cloud Database ('vehicles')
     try {
-      if (rtdb) {
-        await set(ref(rtdb, 'vehicles/' + vId), vehicleData);
-      }
       if (db) {
         await setDoc(doc(db, 'vehicles', vId), vehicleData);
       }
-      console.log(`✅ Saved vehicle ${vId} directly to Firebase DB (ibots-gps)`);
+      console.log(`✅ Saved vehicle ${vId} directly to Firebase Firestore ('vehicles')`);
     } catch (fbErr) {
-      console.warn("⚠️ Firebase DB write warning:", fbErr.message);
+      console.warn("⚠️ Firebase Firestore write warning:", fbErr.message);
     }
 
     // Backup to local DB file
@@ -746,24 +732,20 @@ app.post('/api/vehicles', async (req, res) => {
   }
 });
 
-// 4. Delete Vehicle & Dynamic Device directly from Firebase DB
+// 4. Delete Vehicle & Dynamic Device directly from Firebase Firestore Cloud Database
 app.delete('/api/vehicles/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Delete directly from Firebase DB (RTDB & Firestore)
+    // Delete directly from Firebase Firestore ('vehicles' and 'telemetry' collections)
     try {
-      if (rtdb) {
-        await set(ref(rtdb, 'vehicles/' + id), null);
-        await set(ref(rtdb, 'telemetry/' + id), null);
-      }
       if (db) {
         await deleteDoc(doc(db, 'vehicles', id));
         await deleteDoc(doc(db, 'telemetry', id));
       }
-      console.log(`🗑️ Deleted vehicle ${id} directly from Firebase DB (ibots-gps)`);
+      console.log(`🗑️ Deleted vehicle ${id} directly from Firebase Firestore ('vehicles')`);
     } catch (fbErr) {
-      console.warn("⚠️ Firebase DB delete warning:", fbErr.message);
+      console.warn("⚠️ Firebase Firestore delete warning:", fbErr.message);
     }
 
     localVehicles = localVehicles.filter(v => v.id !== id);
@@ -771,11 +753,12 @@ app.delete('/api/vehicles/:id', async (req, res) => {
     saveDatabase(localVehicles);
 
     broadcast({ type: 'VEHICLE_DELETED', vehicleId: id });
-    res.json({ status: 'ok', message: `Device ${id} deleted successfully from Firebase DB` });
+    res.json({ status: 'ok', message: `Device ${id} deleted successfully from Firebase Firestore` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 // GitHub Webhook Endpoint for Automatic CI/CD Deployment on git push
