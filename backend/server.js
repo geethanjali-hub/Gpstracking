@@ -185,10 +185,48 @@ function broadcast(data) {
   });
 }
 
-// In-Memory fallback store if offline
-let localVehicles = [
-  { id: 'gps-obd-tracker-01', name: 'ESP32 SIM A7670C Hardware Tracker', vin: 'OBD_TRK_001', status: 'online' }
+// ═══════════════════════════════════════════════════════════════════════════
+// LOCAL DATABASE PERSISTENCE LAYER — JSON File Store (vehicles_db.json)
+// ═══════════════════════════════════════════════════════════════════════════
+const DB_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vehicles_db.json');
+
+const defaultVehicles = [
+  {
+    id: 'gps-obd-tracker-01',
+    name: 'ESP32 SIM A7670C Hardware Tracker',
+    userName: 'System Administrator',
+    vin: 'OBD_TRK_001',
+    status: 'online',
+    topic: 'sedhupathi/gps-obd-tracker-01/data',
+    broker: 'mqtt://test.mosquitto.org:1883',
+    createdAt: new Date().toISOString()
+  }
 ];
+
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, 'utf8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn("⚠️ Local DB load warning:", err.message);
+  }
+  saveDatabase(defaultVehicles);
+  return defaultVehicles;
+}
+
+function saveDatabase(data) {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log(`💾 Saved ${data.length} vehicle records to local database (vehicles_db.json)`);
+  } catch (err) {
+    console.error("❌ Failed to save to local database file:", err.message);
+  }
+}
+
+let localVehicles = loadDatabase();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTHENTICATION ROUTES — JWT, Refresh Tokens, OAuth 2.0 & Role Management
@@ -493,33 +531,64 @@ app.post('/api/telemetry', async (req, res) => {
   }
 });
 
-// 2. Fetch Fleet Vehicles — Enforce Single Active Hardware Device (gps-obd-tracker-01)
+// 2. Fetch Fleet Vehicles — Dynamic list of active hardware devices
 app.get('/api/vehicles', async (req, res) => {
-  const singleHardwareDevice = [
-    { id: 'gps-obd-tracker-01', name: 'ESP32 SIM A7670C Hardware Tracker', vin: 'OBD_TRK_001', status: 'online' }
-  ];
-
-  try {
-    // Sanitize Firebase RTDB & Firestore to ensure no stale mock vehicles persist
-    if (rtdb) {
-      await set(ref(rtdb, 'vehicles'), { 'gps-obd-tracker-01': singleHardwareDevice[0] });
-    }
-    if (db) {
-      await setDoc(doc(db, 'vehicles', 'gps-obd-tracker-01'), singleHardwareDevice[0]);
-    }
-  } catch (err) {
-    console.warn("Firebase sync skipped:", err.message);
-  }
-
-  res.json(singleHardwareDevice);
+  res.json(localVehicles);
 });
 
-// 3. Register New Vehicle in Firebase
+// 3. Register New Vehicle & Map Device / MQTT Topic / Broker
 app.post('/api/vehicles', async (req, res) => {
   try {
     const newVehicle = req.body;
-    const vId = newVehicle.id || `V-00${localVehicles.length + 1}`;
-    const vehicleData = { id: vId, ...newVehicle, createdAt: new Date().toISOString() };
+    const vId = newVehicle.id || `gps-tracker-0${localVehicles.length + 1}`;
+    
+    // Check if vehicle already exists
+    const existingIndex = localVehicles.findIndex(v => v.id === vId);
+    const vehicleData = {
+      id: vId,
+      name: newVehicle.name || `Tracker (${vId})`,
+      userName: newVehicle.userName || 'Assigned Driver',
+      vin: newVehicle.vin || `OBD_TRK_${Math.floor(1000 + Math.random() * 9000)}`,
+      status: newVehicle.status || 'offline',
+      topic: newVehicle.topic || `sedhupathi/${vId}/data`,
+      broker: newVehicle.broker || 'mqtt://test.mosquitto.org:1883',
+      routeEnabled: true,
+      geofenceEnabled: true,
+      deviationThreshold: 300,
+      alertSettings: {
+        maxSpeed: parseInt(newVehicle.maxSpeed || 120),
+        maxTemp: parseInt(newVehicle.maxTemp || 105),
+        minFuel: parseInt(newVehicle.minFuel || 15)
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      localVehicles[existingIndex] = { ...localVehicles[existingIndex], ...vehicleData };
+    } else {
+      localVehicles.push(vehicleData);
+    }
+
+    // Save to local JSON Database file!
+    saveDatabase(localVehicles);
+
+    // Initialize telemetry slot if not present
+    if (!localTelemetry[vId]) {
+      localTelemetry[vId] = {
+        vehicleId: vId,
+        isOnline: false,
+        status: 'offline',
+        gpsValid: false,
+        fix: false,
+        lat: null,
+        lng: null,
+        speed: 0,
+        heading: 0,
+        satellites: 0,
+        rpm: 0,
+        fuelLevel: 0
+      };
+    }
 
     try {
       if (rtdb) {
@@ -533,10 +602,50 @@ app.post('/api/vehicles', async (req, res) => {
       console.warn("Firebase write skipped:", fbErr.message);
     }
 
-    localVehicles.push(vehicleData);
+    // Dynamically subscribe to the MQTT topic if provided
+    if (vehicleData.topic && mqttClient && mqttClient.connected) {
+      mqttClient.subscribe(vehicleData.topic, (err) => {
+        if (!err) {
+          console.log(`📡 MQTT: Dynamically subscribed to custom topic: ${vehicleData.topic}`);
+        } else {
+          console.warn(`📡 MQTT: Failed to subscribe to ${vehicleData.topic}:`, err.message);
+        }
+      });
+    }
+
     broadcast({ type: 'VEHICLE_ADDED', data: vehicleData });
 
     res.status(201).json(vehicleData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Delete Vehicle & Dynamic Device from DB
+app.delete('/api/vehicles/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    localVehicles = localVehicles.filter(v => v.id !== id);
+    delete localTelemetry[id];
+
+    // Save to local JSON Database file!
+    saveDatabase(localVehicles);
+
+    try {
+      if (rtdb) {
+        await set(ref(rtdb, 'vehicles/' + id), null);
+        await set(ref(rtdb, 'telemetry/' + id), null);
+      }
+      if (db) {
+        await deleteDoc(doc(db, 'vehicles', id));
+        await deleteDoc(doc(db, 'telemetry', id));
+      }
+    } catch (fbErr) {
+      console.warn("Firebase delete skipped:", fbErr.message);
+    }
+
+    broadcast({ type: 'VEHICLE_DELETED', vehicleId: id });
+    res.json({ status: 'ok', message: `Device ${id} deleted successfully from DB` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -754,9 +863,11 @@ const frontendDistPath = path.join(__dirname, '../frontend/dist');
 
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(frontendDistPath, 'index.html'));
+    }
+    next();
   });
 }
 

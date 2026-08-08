@@ -31,64 +31,12 @@ export default function App() {
   const [role, setRole] = useState(getUserProfile()?.role || localStorage.getItem('role') || 'viewer');
   const [activeTab, setActiveTab] = useState('tracking');
   
-  const [vehicles, setVehicles] = useState([
-    {
-      id: 'gps-obd-tracker-01',
-      name: 'ESP32 SIM A7670C Hardware Tracker',
-      vin: 'OBD_TRK_001',
-      status: 'online',
-      routeEnabled: true,
-      geofenceEnabled: true,
-      deviationThreshold: 300,
-      alertSettings: { maxSpeed: 120, maxTemp: 105, minFuel: 15 }
-    }
-  ]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState('gps-obd-tracker-01');
-  const [telemetry, setTelemetry] = useState({
-    'gps-obd-tracker-01': {
-      lat: null,
-      lng: null,
-      fix: false,
-      gpsValid: false,
-      isOnline: false,
-      status: 'offline',
-      routeIndex: 0,
-      speed: 0,
-      heading: 0,
-      accuracy: 0,
-      satellites: 0,
-      altitude: 0,
-      tripDistance: 0,
-      todayRunningKm: 0,
-      avgSpeed: 0,
-      maxSpeed: 0,
-      rpm: 0,
-      coolantTemp: 0,
-      engineLoad: 0,
-      checkEngine: false,
-      checkEngineCode: null,
-      fuelLevel: 0,
-      fuelConsumption: 0,
-      fuelRate: 0,
-      backupBatteryPercent: 0,
-      backupBatteryVoltage: 0,
-      chargingStatus: 'discharging',
-      powerSource: 'vehicle',
-      routeDeviationMeters: 0,
-      isDeviated: false,
-      inGeofence: true,
-      shockX: 0,
-      shockY: 0,
-      shockZ: 0,
-      maxShockG: 0,
-      tamperDetected: false
-    }
-  });
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [telemetry, setTelemetry] = useState({});
   const [alerts, setAlerts] = useState([]);
   const [routes, setRoutes] = useState({});
-  const [geofences, setGeofences] = useState({
-    'gps-obd-tracker-01': { lat: 11.0, lng: 77.0, radius: 400, name: 'Default Zone' }
-  });
+  const [geofences, setGeofences] = useState({});
   const [currentAddress, setCurrentAddress] = useState({});
   const [currentArea, setCurrentArea] = useState({});
   const [currentStreet, setCurrentStreet] = useState({});
@@ -96,7 +44,7 @@ export default function App() {
   // Force reset legacy cached vehicle selections and reload on build update
   useEffect(() => {
     try {
-      const APP_BUILD_VER = '2026.08.07.HARDWARE_v9';
+      const APP_BUILD_VER = '2026.08.07.HARDWARE_v11';
       const storedVer = localStorage.getItem('app_build_version');
       if (storedVer !== APP_BUILD_VER) {
         localStorage.clear();
@@ -107,28 +55,38 @@ export default function App() {
         }
       }
     } catch (e) {}
-    setSelectedVehicleId('gps-obd-tracker-01');
   }, []);
 
   // Reverse Geocoding Effect using OpenStreetMap Nominatim for Area & Street Name
   useEffect(() => {
     if (!selectedVehicleId) return;
     const t = telemetry[selectedVehicleId] || {};
-    const lat = t.lat ?? 11.02366;
-    const lng = t.lng ?? 76.94241;
+    if (!t.lat || !t.lng) {
+      setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
+      setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
+      setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: 'Awaiting Live GPS Signal...' }));
+      return;
+    }
+    const lat = t.lat;
+    const lng = t.lng;
     const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
 
-    if (currentAddress[key]) return;
+    if (currentAddress[key]) {
+      setCurrentStreet(prev => ({ ...prev, [selectedVehicleId]: currentStreet[key] || `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
+      setCurrentArea(prev => ({ ...prev, [selectedVehicleId]: currentArea[key] || `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
+      setCurrentAddress(prev => ({ ...prev, [selectedVehicleId]: currentAddress[key] || `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
+      return;
+    }
 
     fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`)
       .then(res => res.json())
       .then(data => {
         if (data && (data.address || data.display_name)) {
           const a = data.address || {};
-          const street = a.road || a.pedestrian || a.footway || a.street || a.highway || a.building || a.amenity || 'Bharathi Park Cross Road';
-          const area = a.suburb || a.neighbourhood || a.quarter || a.residential || a.city_district || a.locality || 'Saibaba Colony, West Zone';
-          const city = a.city || a.town || a.county || a.state_district || 'Coimbatore';
-          const state = a.state || 'Tamil Nadu';
+          const street = a.road || a.pedestrian || a.footway || a.street || a.highway || a.building || a.amenity || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          const area = a.suburb || a.neighbourhood || a.quarter || a.residential || a.city_district || a.locality || a.city || 'Live Location';
+          const city = a.city || a.town || a.county || a.state_district || '';
+          const state = a.state || '';
           const pin = a.postcode ? `PIN: ${a.postcode}` : '';
 
           const fullAddr = [street, area, city, state, pin].filter(Boolean).join(', ');
@@ -139,9 +97,10 @@ export default function App() {
         }
       })
       .catch(() => {
-        setCurrentStreet(prev => ({ ...prev, [key]: 'Bharathi Park Cross Road', [selectedVehicleId]: 'Bharathi Park Cross Road' }));
-        setCurrentArea(prev => ({ ...prev, [key]: 'Saibaba Colony', [selectedVehicleId]: 'Saibaba Colony' }));
-        setCurrentAddress(prev => ({ ...prev, [key]: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, [selectedVehicleId]: `${lat.toFixed(5)}, ${lng.toFixed(5)}` }));
+        const rawCoords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        setCurrentStreet(prev => ({ ...prev, [key]: rawCoords, [selectedVehicleId]: rawCoords }));
+        setCurrentArea(prev => ({ ...prev, [key]: rawCoords, [selectedVehicleId]: rawCoords }));
+        setCurrentAddress(prev => ({ ...prev, [key]: rawCoords, [selectedVehicleId]: rawCoords }));
       });
   }, [selectedVehicleId, telemetry[selectedVehicleId]?.lat, telemetry[selectedVehicleId]?.lng]);
   const [chartsHistory, setChartsHistory] = useState([]);
@@ -171,14 +130,15 @@ export default function App() {
 
   // System Users State & User Management Inputs
   const [systemUsers, setSystemUsers] = useState([
-    { id: 'usr-1', username: 'admin', role: 'admin', name: 'System Administrator', assignedVehicle: 'gps-obd-tracker-01', status: 'Active' },
-    { id: 'usr-2', username: 'operator', role: 'operator', name: 'Factory Operator', assignedVehicle: 'gps-obd-tracker-01', status: 'Active' },
-    { id: 'usr-3', username: 'customer', role: 'viewer', name: 'Customer Account', assignedVehicle: 'gps-obd-tracker-01', status: 'Active' }
+    { id: 'usr-1', username: 'admin', role: 'admin', name: 'System Administrator', assignedVehicle: '', status: 'Active' }
   ]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('operator');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserVeh, setNewUserVeh] = useState('gps-obd-tracker-01');
+  const [newUserVeh, setNewUserVeh] = useState('');
+  const [newDeviceId, setNewDeviceId] = useState('');
+  const [newDeviceTopic, setNewDeviceTopic] = useState('');
+  const [newDeviceBroker, setNewDeviceBroker] = useState('mqtt://test.mosquitto.org:1883');
 
   // Editable Alert Threshold State
   const [alertMaxSpeed, setAlertMaxSpeed] = useState('120');
@@ -325,30 +285,22 @@ export default function App() {
 
   // Fetch Vehicles with local fallback
   const fetchVehicles = async () => {
-    const hardwareVehicle = [
-      {
-        id: 'gps-obd-tracker-01',
-        name: 'ESP32 SIM A7670C Hardware Tracker',
-        vin: 'OBD_TRK_001',
-        status: 'online',
-        routeEnabled: true,
-        geofenceEnabled: true,
-        deviationThreshold: 300,
-        alertSettings: { maxSpeed: 120, maxTemp: 105, minFuel: 15 }
-      }
-    ];
     try {
       const res = await fetch('/api/vehicles');
-      const data = await res.json();
-      const list = (Array.isArray(data) && data.length > 0)
-        ? data.filter(v => v && (v.id === 'gps-obd-tracker-01' || v.id === 'ESP32 SIM A7670C Hardware Tracker'))
-        : hardwareVehicle;
-      const finalList = list.length > 0 ? list : hardwareVehicle;
-      setVehicles(finalList);
-      setSelectedVehicleId('gps-obd-tracker-01');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setVehicles(data);
+          if (data.length > 0) {
+            setSelectedVehicleId(prev => (prev && data.some(v => v.id === prev)) ? prev : data[0].id);
+          } else {
+            setSelectedVehicleId('');
+          }
+          return;
+        }
+      }
     } catch (err) {
-      setVehicles(hardwareVehicle);
-      setSelectedVehicleId('gps-obd-tracker-01');
+      console.warn("Failed to fetch vehicles from server DB:", err);
     }
   };
 
@@ -480,22 +432,65 @@ export default function App() {
     }
   };
 
-  // Add New System User
-  const handleAddUser = (e) => {
+  // Add New System User & Map Device / MQTT Topic / Broker
+  const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newUserName) return;
-    const newUser = {
-      id: `usr-${Date.now()}`,
-      username: newUserName.toLowerCase().trim(),
-      role: newUserRole,
-      name: `${newUserName} (${newUserRole.toUpperCase()})`,
-      assignedVehicle: newUserRole === 'viewer' ? newUserVeh : 'Factory Fleet',
-      status: 'Active'
-    };
-    setSystemUsers([...systemUsers, newUser]);
-    setNewUserName('');
-    setNewUserPassword('');
-    alert(`User "${newUserName}" created successfully with role [${newUserRole.toUpperCase()}]!`);
+
+    const userClean = newUserName.trim();
+    const deviceIdClean = (newDeviceId.trim() || `gps-obd-tracker-0${vehicles.length + 1}`).toLowerCase().replace(/\s+/g, '-');
+    const topicClean = newDeviceTopic.trim() || `sedhupathi/${deviceIdClean}/data`;
+    const brokerClean = newDeviceBroker.trim() || `mqtt://test.mosquitto.org:1883`;
+    const deviceNameClean = newVehicleName.trim() || `${userClean}'s Device (${deviceIdClean})`;
+
+    try {
+      // 1. Post to backend API to register new vehicle / device & persist to DB
+      const res = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: deviceIdClean,
+          name: deviceNameClean,
+          userName: userClean,
+          topic: topicClean,
+          broker: brokerClean,
+          vin: `OBD_TRK_${Math.floor(1000 + Math.random() * 9000)}`
+        })
+      });
+
+      if (res.ok) {
+        // 2. Add new user to systemUsers list
+        const newUserObj = {
+          id: `usr-${Date.now()}`,
+          username: userClean.toLowerCase().replace(/\s+/g, '_'),
+          role: newUserRole,
+          name: userClean,
+          assignedVehicle: deviceIdClean,
+          topic: topicClean,
+          broker: brokerClean,
+          status: 'Active'
+        };
+        setSystemUsers(prev => [...prev, newUserObj]);
+
+        // 3. Clear form inputs
+        setNewUserName('');
+        setNewUserPassword('');
+        setNewDeviceId('');
+        setNewDeviceTopic('');
+        setNewVehicleName('');
+
+        // 4. Refresh vehicle list from DB and select the new device
+        await fetchVehicles();
+        setSelectedVehicleId(deviceIdClean);
+
+        alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
+      } else {
+        alert("Failed to register device on server database.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving user and device to database.");
+    }
   };
 
   // Delete System User
@@ -507,6 +502,39 @@ export default function App() {
     if (window.confirm("Delete this user account?")) {
       setSystemUsers(systemUsers.filter(u => u.id !== id));
     }
+  };
+
+  // Delete Vehicle / Device & Associated User Mapping from DB
+  const handleDeleteVehicle = async (vId) => {
+    if (!window.confirm(`Are you sure you want to permanently delete device "${vId}" from the database?`)) {
+      return;
+    }
+
+    setTelemetry(prev => {
+      const updated = { ...prev };
+      delete updated[vId];
+      return updated;
+    });
+
+    try {
+      const res = await fetch(`/api/vehicles/${vId}`, { method: 'DELETE' });
+      if (res.ok) {
+        const remaining = vehicles.filter(v => v.id !== vId);
+        setVehicles(remaining);
+        setSystemUsers(prev => prev.filter(u => u.assignedVehicle !== vId));
+        setSelectedVehicleId(remaining[0]?.id || '');
+        alert(`🗑️ Successfully deleted device "${vId}" from Database.`);
+        return;
+      }
+    } catch (err) {
+      console.warn("Backend delete error:", err);
+    }
+
+    const remaining = vehicles.filter(v => v.id !== vId);
+    setVehicles(remaining);
+    setSystemUsers(prev => prev.filter(u => u.assignedVehicle !== vId));
+    setSelectedVehicleId(remaining[0]?.id || '');
+    alert(`🗑️ Deleted device "${vId}" from session.`);
   };
 
   // Save Alert Thresholds
@@ -623,8 +651,9 @@ export default function App() {
     const container = activeTab === 'home' ? dashboardMapRef.current : trackingMapRef.current;
     if (!container) return;
 
-    const currentData = telemetry[selectedVehicleId] || {};
-    const hasValidCoords = currentData.lat != null && currentData.lng != null && currentData.isOnline !== false;
+    const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+    const currentData = selectedVehicle ? (telemetry[selectedVehicleId] || {}) : {};
+    const hasValidCoords = !!selectedVehicle && currentData.lat != null && currentData.lng != null && currentData.isOnline !== false;
     const mapInstanceRef = activeTab === 'home' ? dashboardMapInstance : trackingMapInstance;
     const markerRef = activeTab === 'home' ? dashboardMarkerInstance : trackingMarkerInstance;
     const centerCoords = hasValidCoords
@@ -1111,37 +1140,37 @@ export default function App() {
             {role !== 'viewer' && (
               <>
                 <li>
-                  <span className="nav-link" onClick={() => alert('ℹ️ Engine Health diagnostics active for ESP32 SIM A7670C Hardware. Continuing live tracking.')}>
+                  <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                     <Compass size={14} /> Engine Health
                   </span>
                 </li>
                 <li>
-                  <span className="nav-link" onClick={() => alert('ℹ️ Fuel Monitoring telemetry active for ESP32 SIM A7670C Hardware. Continuing live tracking.')}>
+                  <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                     <CircleDot size={14} /> Fuel Monitoring
                   </span>
                 </li>
               </>
             )}
             <li>
-              <span className="nav-link" onClick={() => alert('ℹ️ Backup Battery Status active (Voltage: 13.8V). Continuing live tracking.')}>
+              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                 <Battery size={14} /> Backup Battery Status
               </span>
             </li>
             <li>
-              <span className="nav-link" onClick={() => alert('ℹ️ Daily Running Summary active for ESP32 SIM A7670C Hardware. Continuing live tracking.')}>
+              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                 <FileText size={14} /> Daily Running Summary
               </span>
             </li>
             {role !== 'viewer' && (
               <li>
-                <span className="nav-link" onClick={() => alert('ℹ️ Telematics Reports available for export. Continuing live tracking.')}>
+                <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                   <FileText size={14} style={{ color: 'var(--accent-cyan)' }} /> Telematics Reports
                 </span>
               </li>
             )}
             {role === 'admin' && (
               <li>
-                <span className="nav-link" onClick={() => alert('ℹ️ User Management configured for Administrator role. Continuing live tracking.')}>
+                <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
                   <User size={14} /> User Management
                 </span>
               </li>
@@ -1174,7 +1203,7 @@ export default function App() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
                 Live Tracking
                 <span style={{ fontSize: '0.85rem', color: '#06b6d4', fontWeight: 700, backgroundColor: 'rgba(6, 182, 212, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(6, 182, 212, 0.4)' }}>
-                  📡 ESP32 SIM A7670C Tracker (gps-obd-tracker-01)
+                  {selectedVehicle ? `📡 ${selectedVehicle.name} (${selectedVehicle.id})` : '⚠️ No Device Selected'}
                 </span>
               </span>
             )}
@@ -1187,20 +1216,30 @@ export default function App() {
           </h2>
 
           <div className="topbar-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{
-              backgroundColor: 'rgba(6, 182, 212, 0.12)',
-              border: '1px solid rgba(6, 182, 212, 0.35)',
-              color: '#06b6d4',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '6px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem'
-            }} title="Primary Hardware Tracker Device">
-              <span style={{ backgroundColor: '#10b981', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
-              📡 ESP32 SIM A7670C Tracker (gps-obd-tracker-01)
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>📡 Select Device:</span>
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                style={{
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid #06b6d4',
+                  color: '#06b6d4',
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxShadow: '0 0 8px rgba(6, 182, 212, 0.2)'
+                }}
+              >
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.id} style={{ backgroundColor: '#0f172a', color: '#fff' }}>
+                    📡 {v.name} ({v.id})
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               onClick={handleGoogleLogin}
@@ -1484,43 +1523,35 @@ export default function App() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.05em' }}>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Vehicle ID</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Vehicle Name</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>From (Origin)</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>To (Current)</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Filtered Distance</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Avg Speed</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Fuel Level</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Engine Status</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Malfunction</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Performance</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Battery</th>
+                        <th style={{ padding: '0.6rem 0.75rem' }}>Tracker ID</th>
+                        <th style={{ padding: '0.6rem 0.75rem' }}>Tracker Name</th>
+                        <th style={{ padding: '0.6rem 0.75rem' }}>User Name</th>
+                        <th style={{ padding: '0.6rem 0.75rem' }}>MQTT Topic</th>
+                        <th style={{ padding: '0.6rem 0.75rem' }}>Current Location</th>
+                        <th style={{ padding: '0.6rem 0.75rem' }}>Status</th>
                         <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredVehicles.length === 0 ? (
                         <tr>
-                          <td colSpan="12" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                            No vehicles match the selected status filter ({statusFilter}).
+                          <td colSpan="7" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No active hardware devices registered in database. Use <b>User Management</b> to register a device.
                           </td>
                         </tr>
                       ) : (
                         filteredVehicles.map((v) => {
                           const t = telemetry[v.id] || {};
-                          const perf = getPerformance(v.id);
-                          const isMalfunction = perf.rating === 'Poor';
-                          const filteredKm = getFilteredKm(v.id);
-
-                          const fromAddr = t.fix && t.isOnline !== false ? 'Live Hardware Sensor' : 'Offline / No Signal';
+                          const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
                           const toAddr = t.fix && t.isOnline !== false ? (currentAddress[v.id] || 'Transmitting Data') : 'Location Unavailable';
+                          const isLive = t.isOnline !== false && (t.fix || t.lat);
 
                           return (
                             <tr
                               key={v.id}
                               style={{
                                 borderBottom: '1px solid var(--border-color)',
-                                backgroundColor: isMalfunction ? 'rgba(239, 68, 68, 0.05)' : 'transparent',
+                                backgroundColor: 'transparent',
                                 transition: 'background-color 0.2s'
                               }}
                             >
@@ -1530,42 +1561,20 @@ export default function App() {
                               <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
                                 {v.name}
                               </td>
-                              <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>
-                                {fromAddr}
+                              <td style={{ padding: '0.65rem 0.75rem', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                👤 {v.userName || mappedUser?.name || 'System Admin'}
+                              </td>
+                              <td style={{ padding: '0.65rem 0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#38bdf8' }}>
+                                {v.topic || `sedhupathi/${v.id}/data`}
                               </td>
                               <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>
-                                {toAddr}
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600, color: 'var(--accent-green)' }}>
-                                {filteredKm} km
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>
-                                {t.avgSpeed || '--'} km/h
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>
-                                <span style={{ color: (t.fuelLevel || 0) < 15 ? 'var(--accent-red)' : 'var(--text-primary)', fontWeight: 600 }}>
-                                  {t.fuelLevel !== undefined ? `${t.fuelLevel?.toFixed(1)}%` : '--'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>
-                                <span style={{ color: t.checkEngine ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 600 }}>
-                                  {t.checkEngine ? '⚠ MIL Fault' : '✓ Clean'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>
-                                {isMalfunction ? (
-                                  <span style={{ color: 'var(--accent-red)', fontWeight: 700, backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem' }}>
-                                    {perf.malfunction}
-                                  </span>
-                                ) : (
-                                  <span style={{ color: 'var(--text-muted)' }}>None</span>
-                                )}
+                                📍 {toAddr}
                               </td>
                               <td style={{ padding: '0.65rem 0.75rem' }}>
                                 <span
                                   style={{
-                                    backgroundColor: perf.bg,
-                                    color: perf.color,
+                                    backgroundColor: isLive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                    color: isLive ? 'var(--accent-green)' : 'var(--accent-red)',
                                     fontWeight: 700,
                                     padding: '3px 8px',
                                     borderRadius: '4px',
@@ -1575,11 +1584,8 @@ export default function App() {
                                     gap: '4px'
                                   }}
                                 >
-                                  {perf.rating === 'Good' ? '🟢 Good' : perf.rating === 'Fair' ? '🟡 Fair' : '🔴 Poor'}
+                                  {isLive ? '🟢 Online' : '🔴 Offline'}
                                 </span>
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', fontFamily: 'var(--font-mono)' }}>
-                                {t.backupBatteryPercent !== undefined ? `${t.backupBatteryPercent}%` : '--'}
                               </td>
                               <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
                                 <button
@@ -1642,13 +1648,13 @@ export default function App() {
                     alignItems: 'center',
                     gap: '0.4rem'
                   }}>
-                    <span style={{ backgroundColor: '#10b981', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
-                    📡 Active Hardware Tracker: ESP32 SIM A7670C (gps-obd-tracker-01)
+                    <span style={{ backgroundColor: selectedVehicle ? '#10b981' : '#ef4444', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
+                    📡 Active Hardware Tracker: {selectedVehicle ? `${selectedVehicle.name} (${selectedVehicle.id})` : 'None Registered'}
                   </div>
                   <div ref={trackingMapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
                 <div className="panel-container">
-                  <span className="panel-title"><Compass size={14} /> 📡 ESP32 SIM A7670C Tracker Details</span>
+                  <span className="panel-title"><Compass size={14} /> 📡 {selectedVehicle ? selectedVehicle.name : 'Device'} Details</span>
                   <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
@@ -1716,21 +1722,21 @@ export default function App() {
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentStreet[selectedVehicleId] || 'Bharathi Park 4th Cross Road'}
+                    {currentStreet[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentArea[selectedVehicleId] || 'Saibaba Colony, West Zone'}
+                    {currentArea[selectedVehicleId] || (currentData.lat ? 'Live Location' : 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address & PIN</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentAddress[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Saibaba Colony, Coimbatore, Tamil Nadu, India')}
+                    {currentAddress[selectedVehicleId] || (currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
@@ -2120,124 +2126,116 @@ export default function App() {
 
           {/* USER MANAGEMENT TAB */}
           {activeTab === 'settings' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               
-              {/* SECTION 8.1: ADMINISTRATOR */}
               <div>
-                <h3 style={{ fontSize: '1rem', color: 'var(--accent-cyan)', marginBottom: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>8.1 Administrator Settings</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <h3 style={{ fontSize: '1rem', color: 'var(--accent-cyan)', marginBottom: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+                  👥 User & Hardware Device Management
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
                   
-                  {/* Add Vehicle */}
+                  {/* 1. Add User & Map Device Topic */}
                   <div className="panel-container">
-                    <span className="panel-title">Add Vehicle</span>
-                    {role !== 'admin' ? (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Admin security clearance required to add vehicles.</p>
-                    ) : (
-                      <form onSubmit={handleAddVehicle} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="form-group">
-                          <label>Vehicle Model Name</label>
-                          <input type="text" className="form-input" placeholder="e.g. Tesla Model 3" value={newVehicleName} onChange={e => setNewVehicleName(e.target.value)} required />
-                        </div>
-                        <div className="form-group">
-                          <label>VIN Code</label>
-                          <input type="text" className="form-input" placeholder="17 Digit VIN" value={newVehicleVin} onChange={e => setNewVehicleVin(e.target.value)} required />
-                        </div>
-                        <button type="submit" className="action-btn" style={{ marginTop: '0.5rem' }}>
-                          Add Vehicle
-                        </button>
-                      </form>
-                    )}
+                    <span className="panel-title">Register & Save Device</span>
+                    <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <div className="form-group">
+                        <label>Full User Name</label>
+                        <input type="text" className="form-input" placeholder="e.g. John Driver" value={newUserName} onChange={e => setNewUserName(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Tracker ID / Device ID</label>
+                        <input type="text" className="form-input" placeholder="e.g. gps-obd-tracker-02" value={newDeviceId} onChange={e => setNewDeviceId(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Tracker Name / Alias</label>
+                        <input type="text" className="form-input" placeholder="e.g. Truck 2 - OBD Tracker" value={newVehicleName} onChange={e => setNewVehicleName(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label>MQTT Topic Name</label>
+                        <input type="text" className="form-input" placeholder="e.g. sedhupathi/gps-obd-tracker-02/data" value={newDeviceTopic} onChange={e => setNewDeviceTopic(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label>MQTT Broker Host / Name</label>
+                        <input type="text" className="form-input" placeholder="e.g. mqtt://test.mosquitto.org:1883" value={newDeviceBroker} onChange={e => setNewDeviceBroker(e.target.value)} required />
+                      </div>
+                      <button type="submit" className="action-btn" style={{ marginTop: '0.4rem', backgroundColor: 'var(--accent-cyan)' }}>
+                        💾 Save
+                      </button>
+                    </form>
                   </div>
 
-                  {/* Remove Vehicle */}
+                  {/* 2. Registered Devices & Delete Manager */}
                   <div className="panel-container">
-                    <span className="panel-title">Remove Vehicle</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
-                      {vehicles.map(v => (
-                        <div key={v.id} className="param-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.01)', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                          <div>
-                            <strong>{v.name}</strong>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ID: {v.id}</div>
-                          </div>
-                          {role === 'admin' && vehicles.length > 1 && (
-                            <button onClick={() => handleDeleteVehicle(v.id)} style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer' }}>
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                    <span className="panel-title">Registered Devices</span>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      All registered devices below are stored in the database. Click <b>Delete</b> to remove them.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '380px', overflowY: 'auto' }}>
+                      {vehicles.length === 0 ? (
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center' }}>
+                          No registered devices in database. Fill out the form to save a device.
+                        </p>
+                      ) : (
+                        vehicles.map(v => {
+                          const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
+                          return (
+                            <div
+                              key={v.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                                padding: '0.65rem 0.85rem',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-color)'
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                  📡 {v.name}
+                                </strong>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                                  🆔 Tracker ID: <b>{v.id}</b>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                  🛰️ Topic: <code style={{ color: '#38bdf8' }}>{v.topic || `sedhupathi/${v.id}/data`}</code>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                  🌐 Broker: <code style={{ color: '#a7f3d0' }}>{v.broker || 'mqtt://test.mosquitto.org:1883'}</code>
+                                </div>
+                                {(v.userName || mappedUser?.name) && (
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                    👤 User: {v.userName || mappedUser?.name}
+                                  </div>
+                                )}
+                              </div>
+
+                              <button
+                                onClick={() => handleDeleteVehicle(v.id)}
+                                title={`Delete ${v.name}`}
+                                style={{
+                                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                                  color: 'var(--accent-red)',
+                                  padding: '0.4rem 0.65rem',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 600
+                                }}
+                              >
+                                <Trash2 size={14} /> Delete
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
-                  </div>
-
-                  {/* User Management */}
-                  <div className="panel-container">
-                    <span className="panel-title">User Management Roles</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: role === 'admin' ? 'rgba(6,182,212,0.05)' : 'transparent' }}>
-                        <span style={{ fontSize: '0.75rem' }}>Administrator (Full Privilege)</span>
-                        <strong style={{ fontSize: '0.7rem', color: role === 'admin' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>{role === 'admin' ? 'Active User' : 'Authorized'}</strong>
-                      </div>
-                      <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: role === 'operator' ? 'rgba(16,185,129,0.05)' : 'transparent' }}>
-                        <span style={{ fontSize: '0.75rem' }}>Operator (Reports/Alerts)</span>
-                        <strong style={{ fontSize: '0.7rem', color: role === 'operator' ? 'var(--accent-green)' : 'var(--text-muted)' }}>{role === 'operator' ? 'Active User' : 'Authorized'}</strong>
-                      </div>
-                      <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: role === 'viewer' ? 'rgba(59,130,246,0.05)' : 'transparent' }}>
-                        <span style={{ fontSize: '0.75rem' }}>Viewer (Read-Only)</span>
-                        <strong style={{ fontSize: '0.7rem', color: role === 'viewer' ? 'var(--accent-cyan)' : 'var(--text-muted)' }}>{role === 'viewer' ? 'Active User' : 'Authorized'}</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Alert Settings */}
-                  <div className="panel-container">
-                    <span className="panel-title">Alert Settings</span>
-                    {role !== 'admin' ? (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Admin security clearance required to manage thresholds.</p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="floating-stat-row">
-                          <span className="floating-label">Max Speed Limit</span>
-                          <span className="floating-val">{selectedVehicle?.alertSettings.maxSpeed} km/h</span>
-                        </div>
-                        <div className="floating-stat-row">
-                          <span className="floating-label">Max Temp Limit</span>
-                          <span className="floating-val">{selectedVehicle?.alertSettings.maxTemp} °C</span>
-                        </div>
-                        <div className="floating-stat-row">
-                          <span className="floating-label">Min Fuel Level Threshold</span>
-                          <span className="floating-val">{selectedVehicle?.alertSettings.minFuel} %</span>
-                        </div>
-                        <div className="floating-stat-row">
-                          <span className="floating-label">Route Deviation Threshold</span>
-                          <span className="floating-val" style={{ color: 'var(--accent-cyan)' }}>300 m (Default range: 200–500m)</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Assign/Edit Fixed Routes and Geofence Zones */}
-                  <div className="panel-container">
-                    <span className="panel-title">Assign/Edit Fixed Routes and Geofence Zones</span>
-                    {role !== 'admin' ? (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Admin security clearance required to update bounds.</p>
-                    ) : (
-                      <form onSubmit={updateGeofenceBounds} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <div className="form-group">
-                          <label>Geofence Latitude / Longitude</label>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <input type="text" className="form-input" style={{ flex: 1 }} value={geoLat} onChange={e => setGeoLat(e.target.value)} placeholder="Lat" required />
-                            <input type="text" className="form-input" style={{ flex: 1 }} value={geoLng} onChange={e => setGeoLng(e.target.value)} placeholder="Lng" required />
-                          </div>
-                        </div>
-                        <div className="form-group">
-                          <label>Geofence Radius (meters)</label>
-                          <input type="text" className="form-input" value={geoRad} onChange={e => setGeoRad(e.target.value)} required />
-                        </div>
-                        <button type="submit" className="action-btn" style={{ marginTop: '0.25rem' }}>
-                          Save Routes & Geofence
-                        </button>
-                      </form>
-                    )}
                   </div>
 
                 </div>
