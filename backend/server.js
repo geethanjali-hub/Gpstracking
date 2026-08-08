@@ -818,26 +818,23 @@ mqttClient.on('message', async (topic, message) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HARDWARE LIVENESS & OFFLINE DETECTION MONITOR
-// Runs every 3 seconds — automatically detects if ESP32 device is powered off
+// Runs every 5 seconds — automatically detects if ESP32 device is powered off
 // ═══════════════════════════════════════════════════════════════════════════
 const deviceLastSeen = new Map();
-const OFFLINE_TIMEOUT_MS = 12000; // Mark device offline if no packet for > 12s
+const OFFLINE_TIMEOUT_MS = 45000; // Mark device offline if no packet for > 45s (prevents flickering)
 
 setInterval(() => {
   const now = Date.now();
   for (const [vId, lastSeen] of deviceLastSeen.entries()) {
     if (now - lastSeen > OFFLINE_TIMEOUT_MS) {
-      if (localTelemetry[vId] && localTelemetry[vId].isOnline !== false) {
-        console.log(`⚠️ Heartbeat Alert: Hardware device ${vId} went OFFLINE (No MQTT packet for >12s)`);
+      const existingDoc = localTelemetryByTopic[vId] || localTelemetry[vId];
+      if (existingDoc && existingDoc.isOnline !== false) {
+        console.log(`⚠️ Heartbeat Alert: Hardware device/topic ${vId} went OFFLINE (No MQTT packet for >45s)`);
         
         const offlineDoc = {
-          ...localTelemetry[vId],
+          ...existingDoc,
           isOnline: false,
           status: 'offline',
-          gpsValid: false,
-          fix: false,
-          lat: null,
-          lng: null,
           speed: 0,
           rpm: 0,
           satellites: 0,
@@ -845,6 +842,9 @@ setInterval(() => {
           offlineNotice: 'DEVICE POWERED OFF / DISCONNECTED'
         };
 
+        if (existingDoc.topic) {
+          localTelemetryByTopic[existingDoc.topic] = offlineDoc;
+        }
         localTelemetry[vId] = offlineDoc;
         broadcast({ type: 'TELEMETRY_UPDATE', vehicleId: vId, data: offlineDoc });
 
@@ -854,7 +854,8 @@ setInterval(() => {
       }
     }
   }
-}, 3000);
+}, 5000);
+
 
 // Authenticate Backend Server with Firebase Auth
 signInWithEmailAndPassword(auth, "esp32@ibots.academy", "IbotsGPS2026!")
