@@ -16,7 +16,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "http://64.227.179.37:3001/api/$1"
+      "destination": "https://gpstracking-gttn.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",

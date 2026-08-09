@@ -1,10 +1,9 @@
 [
   {
     "id": "gps-obd-tracker-01",
-    "name": "gps v2",
-
-    "userName": "Test driver 1",
-    "vin": "OBD_TRK_8750",
+    "name": "GPS v2",
+    "userName": "GPS v2",
+    "vin": "OBD_TRK_6329",
     "status": "offline",
     "topic": "sedhupathi/gps-obd-tracker-01/data",
     "broker": "mqtt://test.mosquitto.org:1883",
@@ -16,6 +15,24 @@
       "maxTemp": 105,
       "minFuel": 15
     },
-    "createdAt": "2026-08-08T10:08:41.934Z"
+    "createdAt": "2026-08-08T15:52:06.578Z"
+  },
+  {
+    "id": "ibots-tracker-1",
+    "name": "Gps v1",
+    "userName": "Gps v1",
+    "vin": "OBD_TRK_4381",
+    "status": "offline",
+    "topic": "ibots/tracker/1/location",
+    "broker": "mqtt://test.mosquitto.org:1883",
+    "routeEnabled": true,
+    "geofenceEnabled": true,
+    "deviationThreshold": 300,
+    "alertSettings": {
+      "maxSpeed": 120,
+      "maxTemp": 105,
+      "minFuel": 15
+    },
+    "createdAt": "2026-08-08T15:56:06.577Z"
   }
 ]
