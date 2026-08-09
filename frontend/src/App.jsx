@@ -32,13 +32,46 @@ import Chart from 'chart.js/auto';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { subscribeToTelemetry } from './firebase';
-import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getUserProfile, authFetch } from './api';
+import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getRefreshToken, refreshAccessToken, getUserProfile, authFetch } from './api';
 
 export default function App() {
   const [token, setToken] = useState(getAccessToken() || null);
   const [role, setRole] = useState(getUserProfile()?.role || localStorage.getItem('role') || 'viewer');
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('tracking');
   const [fleetViewMode, setFleetViewMode] = useState('list'); // 'list' | 'grid'
+
+  // Restore authenticated session seamlessly across browser refreshes
+  useEffect(() => {
+    async function restoreSession() {
+      const existingToken = getAccessToken();
+      const rToken = getRefreshToken();
+
+      if (existingToken) {
+        setToken(existingToken);
+        const user = getUserProfile();
+        if (user?.role) setRole(user.role);
+        setAuthLoading(false);
+        return;
+      }
+
+      if (rToken) {
+        try {
+          const newToken = await refreshAccessToken();
+          if (newToken) {
+            setToken(newToken);
+            const user = getUserProfile();
+            if (user?.role) setRole(user.role);
+          }
+        } catch (err) {
+          console.warn("Silent session restoration failed:", err);
+        }
+      }
+      setAuthLoading(false);
+    }
+
+    restoreSession();
+  }, []);
   
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -1071,6 +1104,17 @@ export default function App() {
       }
     }
   }, [activeTab, chartsHistory, shockDataList, dailySummary]);
+
+  if (authLoading) {
+    return (
+      <div className="auth-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ textAlign: 'center', color: 'var(--accent-cyan)' }}>
+          <Shield size={36} style={{ marginBottom: '0.75rem' }} />
+          <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>🔐 Verifying Armstrong GPS Session Security...</div>
+        </div>
+      </div>
+    );
+  }
 
   // Auth screen
   if (!token || token === 'guest-token') {
