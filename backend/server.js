@@ -811,8 +811,9 @@ app.post('/api/vehicles', async (req, res) => {
         }
       });
 
-      // 📱 Publish MQTT Numbers Payload to Topic: sedhupathi/<tracker_id>/number
-      const numberTopic = `sedhupathi/${vId}/number`;
+      // 📱 Publish MQTT Numbers Payload to Topics: ibots/tracker/<tracker_id>/number & sedhupathi/<tracker_id>/number
+      const numberTopic1 = `ibots/tracker/${vId}/number`;
+      const numberTopic2 = `sedhupathi/${vId}/number`;
       const numberPayload = JSON.stringify({
         tracker_id: vId,
         alert_status: smsAlertStatus,
@@ -820,9 +821,11 @@ app.post('/api/vehicles', async (req, res) => {
         phone_numbers: phoneNumbers,
         timestamp: new Date().toISOString()
       });
-      mqttClient.publish(numberTopic, numberPayload, { qos: 1, retain: true });
+      mqttClient.publish(numberTopic1, numberPayload, { qos: 1, retain: true });
+      mqttClient.publish(numberTopic2, numberPayload, { qos: 1, retain: true });
       mqttClient.publish(`sedhupathi/${vId}/config`, numberPayload, { qos: 1, retain: true });
-      console.log(`📡 MQTT: Broadcasted numbers payload to topic [${numberTopic}] (alert_status: ${smsAlertStatus}, count: ${phoneNumbers.length})`);
+      mqttClient.publish(`ibots/tracker/${vId}/config`, numberPayload, { qos: 1, retain: true });
+      console.log(`📡 MQTT: Broadcasted numbers payload to topics [${numberTopic1}] & [${numberTopic2}] (alert_status: ${smsAlertStatus}, count: ${phoneNumbers.length})`);
     }
 
     broadcast({ type: 'VEHICLE_ADDED', data: vehicleData });
@@ -1254,7 +1257,8 @@ function checkStationaryAlert(vehicleId, lat, lng, speed, address) {
       if (alertStatus === 'OFF') {
         console.log(`🔇 SMS Alerts disabled (alert_status=OFF) for vehicle ${vehicleId}. Skipping SMS dispatch.`);
       } else if (mqttClient && mqttClient.connected && targetPhones.length > 0) {
-        const numberTopic = `sedhupathi/${vehicleId}/number`;
+        const numberTopic1 = `ibots/tracker/${vehicleId}/number`;
+        const numberTopic2 = `sedhupathi/${vehicleId}/number`;
         const smsAlertPayload = JSON.stringify({
           cmd: "SEND_SMS_ALERT",
           tracker_id: vehicleId,
@@ -1266,9 +1270,11 @@ function checkStationaryAlert(vehicleId, lat, lng, speed, address) {
           phone_numbers: targetPhones,
           timestamp: new Date().toISOString()
         });
-        mqttClient.publish(numberTopic, smsAlertPayload, { qos: 1 });
+        mqttClient.publish(numberTopic1, smsAlertPayload, { qos: 1 });
+        mqttClient.publish(numberTopic2, smsAlertPayload, { qos: 1 });
         mqttClient.publish(`sedhupathi/${vehicleId}/config`, smsAlertPayload, { qos: 1 });
-        console.log(`📱 MQTT: Dispatched SMS alert to ESP32 GSM Module on topic [${numberTopic}] for ${targetPhones.length} numbers`);
+        mqttClient.publish(`ibots/tracker/${vehicleId}/config`, smsAlertPayload, { qos: 1 });
+        console.log(`📱 MQTT: Dispatched SMS alert to ESP32 / Quectel GSM Module on topics [${numberTopic1}] & [${numberTopic2}] for ${targetPhones.length} numbers`);
       }
     }
   } else {
