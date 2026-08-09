@@ -836,10 +836,10 @@ app.post('/api/vehicles', async (req, res) => {
 });
 
 // 4. Delete Vehicle & Dynamic Device directly from Firebase Firestore Cloud Database
-app.delete('/api/vehicles/:id', async (req, res) => {
+app.delete(['/api/vehicles/:id', '/api/vehicles/*'], async (req, res) => {
   try {
-    const { id } = req.params;
-    const targetId = decodeURIComponent(id).trim();
+    const rawId = req.params.id || req.params[0] || '';
+    const targetId = decodeURIComponent(rawId).trim();
 
     console.log(`🗑️ DELETE /api/vehicles request received for ID/Name: "${targetId}"`);
 
@@ -1337,20 +1337,25 @@ function checkStationaryAlert(vehicleId, lat, lng, speed, address) {
   }
 }
 
-// REST APIs for Route History Replay & Stationary Alerts
-app.get('/api/history/:vehicleId', async (req, res) => {
+// Helper to extract vehicleId clean from wildcard route param or named param
+function extractVehicleId(req) {
+  const raw = req.params.vehicleId || req.params[0] || '';
+  return decodeURIComponent(raw).trim();
+}
+
+// REST APIs for Route History Replay
+app.get(['/api/history/:vehicleId', '/api/history/*'], async (req, res) => {
   try {
-    const { vehicleId } = req.params;
+    const targetId = extractVehicleId(req);
     if (db) {
       const snapshot = await getDocs(collection(db, 'telemetry_history'));
       const points = [];
       snapshot.forEach(docSnap => {
         const d = docSnap.data();
-        if (d.vehicleId === vehicleId && d.lat && d.lng) {
+        if ((d.vehicleId === targetId || d.topicDevice === targetId) && d.lat && d.lng) {
           points.push(d);
         }
       });
-      // Sort chronologically by timestamp
       points.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       return res.json(points);
     }
@@ -1361,17 +1366,16 @@ app.get('/api/history/:vehicleId', async (req, res) => {
 });
 
 // Telemetry Diagnostics Chart Data API
-app.get('/api/charts/:vehicleId', async (req, res) => {
+app.get(['/api/charts/:vehicleId', '/api/charts/*'], async (req, res) => {
   try {
-    const { vehicleId } = req.params;
-    const targetId = decodeURIComponent(vehicleId);
+    const targetId = extractVehicleId(req);
 
     const historyPoints = [];
     if (db) {
       const snapshot = await getDocs(collection(db, 'telemetry_history'));
       snapshot.forEach(docSnap => {
         const d = docSnap.data();
-        if (d.vehicleId === targetId || d.vehicleId === vehicleId || d.topicDevice === targetId) {
+        if (d.vehicleId === targetId || d.topicDevice === targetId) {
           historyPoints.push(d);
         }
       });
@@ -1390,7 +1394,7 @@ app.get('/api/charts/:vehicleId', async (req, res) => {
 
     // If no history points logged yet, provide current live telemetry point
     if (chartData.length === 0) {
-      const live = localTelemetry[targetId] || localTelemetry[vehicleId] || {};
+      const live = localTelemetry[targetId] || {};
       chartData.push({
         time: new Date().toLocaleTimeString(),
         speed: live.speed || 0,
@@ -1408,10 +1412,9 @@ app.get('/api/charts/:vehicleId', async (req, res) => {
 });
 
 // Vibration & Shock Spike Data API
-app.get('/api/shock/:vehicleId', (req, res) => {
-  const { vehicleId } = req.params;
-  const targetId = decodeURIComponent(vehicleId);
-  const live = localTelemetry[targetId] || localTelemetry[vehicleId] || {};
+app.get(['/api/shock/:vehicleId', '/api/shock/*'], (req, res) => {
+  const targetId = extractVehicleId(req);
+  const live = localTelemetry[targetId] || {};
   
   res.json([
     {
@@ -1423,10 +1426,9 @@ app.get('/api/shock/:vehicleId', (req, res) => {
 });
 
 // Daily Running Mileage & Hours Summary API
-app.get('/api/summaries/:vehicleId', (req, res) => {
-  const { vehicleId } = req.params;
-  const targetId = decodeURIComponent(vehicleId);
-  const live = localTelemetry[targetId] || localTelemetry[vehicleId] || {};
+app.get(['/api/summaries/:vehicleId', '/api/summaries/*'], (req, res) => {
+  const targetId = extractVehicleId(req);
+  const live = localTelemetry[targetId] || {};
 
   res.json({
     mileageHistory: [
