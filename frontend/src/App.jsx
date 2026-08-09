@@ -475,7 +475,7 @@ export default function App() {
         if (Array.isArray(data)) {
           data = data.map(v => ({
             ...v,
-            name: (v.name && v.name.includes('ESP32')) ? 'Gps v2' : (v.name || 'Gps v2')
+            name: v.name || `Tracker (${v.id})`
           }));
           setVehicles(data);
           if (data.length > 0) {
@@ -954,9 +954,12 @@ export default function App() {
         const markerColor = '#06b6d4';
         const markerSymbol = '🛰️';
 
+        const selectedVeh = vehicles.find(v => v.id === selectedVehicleId);
+        const vehNameDisplay = selectedVeh?.name || selectedVehicleId || 'GPS Tracker';
+
         const popupContent = `
           <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
-            <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} Gps v2</strong><br/>
+            <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} ${vehNameDisplay}</strong><br/>
             <strong>Status:</strong> <span style="color:#10b981; font-weight:bold;">🟢 Live GPS Stream</span><br/>
             <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}
           </div>
