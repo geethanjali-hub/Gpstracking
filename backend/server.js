@@ -836,24 +836,64 @@ app.post('/api/vehicles', async (req, res) => {
 app.delete('/api/vehicles/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const targetId = decodeURIComponent(id);
 
-    // Delete directly from Firebase Firestore ('vehicles' and 'telemetry' collections)
+    // Delete directly from Firebase Firestore ('vehicles', 'telemetry', and 'telemetry_history' collections)
     try {
       if (db) {
-        await deleteDoc(doc(db, 'vehicles', id));
-        await deleteDoc(doc(db, 'telemetry', id));
+        await deleteDoc(doc(db, 'vehicles', targetId));
+        await deleteDoc(doc(db, 'telemetry', targetId));
+
+        // Delete any matching docs by ID or Name in vehicles collection
+        const snapshot = await getDocs(collection(db, 'vehicles'));
+        for (const dSnap of snapshot.docs) {
+          const vData = dSnap.data();
+          if (vData.id === targetId || vData.id === id || vData.name === targetId) {
+            await deleteDoc(dSnap.ref);
+          }
+        }
       }
-      console.log(`🗑️ Deleted vehicle ${id} directly from Firebase Firestore ('vehicles')`);
+      console.log(`🗑️ Deleted vehicle "${targetId}" directly from Firebase Firestore Cloud Database ('vehicles')`);
     } catch (fbErr) {
       console.warn("⚠️ Firebase Firestore delete warning:", fbErr.message);
     }
 
-    localVehicles = localVehicles.filter(v => v.id !== id);
+    localVehicles = localVehicles.filter(v => v.id !== targetId && v.id !== id && v.name !== targetId);
+    delete localTelemetry[targetId];
     delete localTelemetry[id];
+    delete localTelemetryByTopic[targetId];
     saveDatabase(localVehicles);
 
-    broadcast({ type: 'VEHICLE_DELETED', vehicleId: id });
-    res.json({ status: 'ok', message: `Device ${id} deleted successfully from Firebase Firestore` });
+    broadcast({ type: 'VEHICLE_DELETED', vehicleId: targetId });
+    res.json({ status: 'ok', message: `Device ${targetId} permanently deleted from database.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete System User directly from Database
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetId = decodeURIComponent(id);
+
+    try {
+      if (db) {
+        await deleteDoc(doc(db, 'users', targetId));
+        const snapshot = await getDocs(collection(db, 'users'));
+        for (const dSnap of snapshot.docs) {
+          const uData = dSnap.data();
+          if (uData.id === targetId || uData.username === targetId) {
+            await deleteDoc(dSnap.ref);
+          }
+        }
+      }
+      console.log(`🗑️ Deleted user "${targetId}" directly from Firebase Firestore ('users')`);
+    } catch (fbErr) {
+      console.warn("⚠️ Firebase user delete warning:", fbErr.message);
+    }
+
+    res.json({ status: 'ok', message: `User ${targetId} permanently deleted from database.` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

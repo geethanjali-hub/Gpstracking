@@ -638,48 +638,55 @@ export default function App() {
     }
   };
 
-  // Delete System User
-  const handleDeleteUser = (id) => {
+  // Delete System User permanently from Database
+  const handleDeleteUser = async (id) => {
     if (systemUsers.length <= 1) {
       alert("Cannot delete the last remaining admin account.");
       return;
     }
-    if (window.confirm("Delete this user account?")) {
-      setSystemUsers(systemUsers.filter(u => u.id !== id));
+    if (!window.confirm("Are you sure you want to permanently delete this user account from the database?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSystemUsers(prev => prev.filter(u => u.id !== id));
+        alert(`🗑️ Successfully deleted user account from Database.`);
+      } else {
+        alert("Failed to delete user account from server database.");
+      }
+    } catch (err) {
+      console.error("Backend delete user error:", err);
+      alert("Error deleting user from database.");
     }
   };
 
-  // Delete Vehicle / Device & Associated User Mapping from DB
+  // Delete Vehicle / Device & Associated User Mapping permanently from DB
   const handleDeleteVehicle = async (vId) => {
     if (!window.confirm(`Are you sure you want to permanently delete device "${vId}" from the database?`)) {
       return;
     }
 
-    setTelemetry(prev => {
-      const updated = { ...prev };
-      delete updated[vId];
-      return updated;
-    });
-
     try {
-      const res = await fetch(`${API_BASE}/api/vehicles/${vId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/vehicles/${encodeURIComponent(vId)}`, { method: 'DELETE' });
       if (res.ok) {
-        const remaining = vehicles.filter(v => v.id !== vId);
+        setTelemetry(prev => {
+          const updated = { ...prev };
+          delete updated[vId];
+          return updated;
+        });
+        const remaining = vehicles.filter(v => v.id !== vId && v.name !== vId);
         setVehicles(remaining);
         setSystemUsers(prev => prev.filter(u => u.assignedVehicle !== vId));
         setSelectedVehicleId(remaining[0]?.id || '');
-        alert(`🗑️ Successfully deleted device "${vId}" from Database.`);
-        return;
+        alert(`🗑️ Successfully deleted device "${vId}" permanently from Database.`);
+      } else {
+        alert(`Failed to delete device "${vId}" from server database.`);
       }
     } catch (err) {
-      console.warn("Backend delete error:", err);
+      console.error("Backend delete vehicle error:", err);
+      alert(`Error deleting device "${vId}" from database.`);
     }
-
-    const remaining = vehicles.filter(v => v.id !== vId);
-    setVehicles(remaining);
-    setSystemUsers(prev => prev.filter(u => u.assignedVehicle !== vId));
-    setSelectedVehicleId(remaining[0]?.id || '');
-    alert(`🗑️ Deleted device "${vId}" from session.`);
   };
 
   // Save Alert Thresholds
