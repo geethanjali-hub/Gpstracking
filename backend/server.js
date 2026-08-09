@@ -317,11 +317,13 @@ app.post('/api/auth/login', async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
+
     // Set Refresh Token in secure HTTP-only Cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: false, // set true in HTTPS production
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -362,10 +364,12 @@ app.post('/api/auth/refresh', (req, res) => {
     return res.status(401).json({ error: result.error, code: 'INVALID_REFRESH_TOKEN' });
   }
 
+  const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
+
   res.cookie('refreshToken', result.refreshToken, {
     httpOnly: true,
-    secure: false,
-    sameSite: 'lax',
+    secure: isSecure,
+    sameSite: isSecure ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
 
@@ -437,11 +441,12 @@ app.post('/api/auth/google', async (req, res) => {
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
