@@ -2,9 +2,11 @@
  * Enterprise API & Authentication Client with JWT, Refresh Tokens & OAuth 2.0
  */
 
-const API_BASE = (typeof window !== 'undefined')
-  ? (window.location.port === '3000' || window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin)
-  : 'http://localhost:3001';
+const API_BASE = import.meta.env?.VITE_API_BASE || (
+  (typeof window !== 'undefined')
+    ? (window.location.port === '3000' || window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://gpstracking-gttn.onrender.com')
+    : 'https://gpstracking-gttn.onrender.com'
+);
 
 
 // Token Storage Keys
