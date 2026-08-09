@@ -32,7 +32,7 @@ import Chart from 'chart.js/auto';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { subscribeToTelemetry } from './firebase';
-import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getRefreshToken, refreshAccessToken, getUserProfile, authFetch } from './api';
+import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getRefreshToken, refreshAccessToken, getUserProfile, authFetch, API_BASE } from './api';
 
 export default function App() {
   const [token, setToken] = useState(getAccessToken() || null);
@@ -95,7 +95,7 @@ export default function App() {
     if (!vId) return;
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/history/${vId}`);
+      const res = await fetch(`${API_BASE}/api/history/${vId}`);
       if (res.ok) {
         const pts = await res.json();
         setHistoryTrail(pts);
@@ -111,7 +111,7 @@ export default function App() {
   // Fetch Live Alerts from Backend & Firebase
   const fetchLiveAlerts = async () => {
     try {
-      const res = await fetch('/api/alerts');
+      const res = await fetch(`${API_BASE}/api/alerts`);
       if (res.ok) {
         const data = await res.json();
         setAlerts(data);
@@ -380,7 +380,7 @@ export default function App() {
   // Fetch Vehicles with local fallback
   const fetchVehicles = async () => {
     try {
-      const res = await fetch('/api/vehicles');
+      const res = await fetch(`${API_BASE}/api/vehicles`);
       if (res.ok) {
         let data = await res.json();
         if (Array.isArray(data)) {
@@ -407,15 +407,15 @@ export default function App() {
   const fetchCharts = async (vid) => {
     if (!vid) return;
     try {
-      const resCharts = await fetch(`/api/charts/${vid}`);
+      const resCharts = await fetch(`${API_BASE}/api/charts/${vid}`);
       const dCharts = await resCharts.json();
       setChartsHistory(dCharts);
 
-      const resShock = await fetch(`/api/shock/${vid}`);
+      const resShock = await fetch(`${API_BASE}/api/shock/${vid}`);
       const dShock = await resShock.json();
       setShockDataList(dShock);
 
-      const resSum = await fetch(`/api/summaries/${vid}`);
+      const resSum = await fetch(`${API_BASE}/api/summaries/${vid}`);
       const dSum = await resSum.json();
       setDailySummary(dSum);
     } catch (err) {
@@ -464,7 +464,7 @@ export default function App() {
   const triggerShockSpike = async () => {
     if (!selectedVehicleId) return;
     try {
-      await fetch('/api/control/trigger-shock', {
+      await fetch(`${API_BASE}/api/control/trigger-shock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicleId: selectedVehicleId })
@@ -478,7 +478,7 @@ export default function App() {
   const togglePower = async (source) => {
     if (!selectedVehicleId) return;
     try {
-      await fetch('/api/control/toggle-power', {
+      await fetch(`${API_BASE}/api/control/toggle-power`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicleId: selectedVehicleId, source })
@@ -493,7 +493,7 @@ export default function App() {
     e.preventDefault();
     if (!selectedVehicleId || !geoLat || !geoLng) return;
     try {
-      await fetch(`/api/geofences/${selectedVehicleId}`, {
+      await fetch(`${API_BASE}/api/geofences/${selectedVehicleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat: geoLat, lng: geoLng, radius: geoRad })
@@ -508,7 +508,7 @@ export default function App() {
     e.preventDefault();
     if (!newVehicleName || !newVehicleVin) return;
     try {
-      const res = await fetch('/api/vehicles', {
+      const res = await fetch(`${API_BASE}/api/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -566,7 +566,7 @@ export default function App() {
       .filter(p => p.length > 0);
 
     try {
-      const res = await fetch('/api/vehicles', {
+      const res = await fetch(`${API_BASE}/api/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -596,7 +596,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch('/api/control/test-sms', {
+      const res = await fetch(`${API_BASE}/api/control/test-sms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vehicleId: smsTargetVehicleId })
@@ -626,7 +626,7 @@ export default function App() {
 
     try {
       // 1. Post to backend API to register new vehicle / device & persist to DB
-      const res = await fetch('/api/vehicles', {
+      const res = await fetch(`${API_BASE}/api/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -698,7 +698,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch(`/api/vehicles/${vId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/vehicles/${vId}`, { method: 'DELETE' });
       if (res.ok) {
         const remaining = vehicles.filter(v => v.id !== vId);
         setVehicles(remaining);
