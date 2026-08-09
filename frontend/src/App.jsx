@@ -38,6 +38,7 @@ export default function App() {
   const [token, setToken] = useState(getAccessToken() || null);
   const [role, setRole] = useState(getUserProfile()?.role || localStorage.getItem('role') || 'viewer');
   const [activeTab, setActiveTab] = useState('tracking');
+  const [fleetViewMode, setFleetViewMode] = useState('list'); // 'list' | 'grid'
   
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -1203,26 +1204,9 @@ export default function App() {
                 <Map size={14} /> {role === 'viewer' ? 'My Live Tracking' : 'Live Tracking'}
               </span>
             </li>
-            {role !== 'viewer' && (
-              <li>
-                <span className={`nav-link ${activeTab === 'grid' ? 'active' : ''}`} onClick={() => setActiveTab('grid')}>
-                  <LayoutGrid size={14} style={{ color: 'var(--accent-cyan)' }} /> Admin Fleet Grid
-                </span>
-              </li>
-            )}
             <li>
               <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
                 <Clock size={14} style={{ color: '#8b5cf6' }} /> Route History Replay
-              </span>
-            </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
-                <AlertTriangle size={14} style={{ color: '#ef4444' }} /> 1-Hour Idle Alerts
-                {alerts.length > 0 && (
-                  <span style={{ marginLeft: 'auto', backgroundColor: '#ef4444', color: '#fff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px' }}>
-                    {alerts.length}
-                  </span>
-                )}
               </span>
             </li>
             <li>
@@ -1502,20 +1486,40 @@ export default function App() {
 
                 {/* System alert feed */}
                 <div className="panel-container" style={{ height: '360px', display: 'flex', flexDirection: 'column' }}>
-                  <div className="panel-header">
-                    <span className="panel-title"><Bell size={14} /> Fleet Live Alerts</span>
+                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="panel-title"><Bell size={14} style={{ color: '#ef4444' }} /> Fleet Live Alerts</span>
+                    {alerts.length > 0 && (
+                      <span style={{ backgroundColor: '#ef4444', color: '#fff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
+                        {alerts.length} New
+                      </span>
+                    )}
                   </div>
-                  <div className="log-list" style={{ flex: 1, overflowY: 'auto' }}>
+                  <div className="log-list" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '4px' }}>
                     {alerts.length === 0 ? (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No system alerts recorded.</span>
+                      <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                        ✅ No system alerts recorded. All vehicles operational.
+                      </div>
                     ) : (
                       alerts.map(log => (
-                        <div key={log.id} className={`log-item ${log.severity}`}>
-                          <div>
-                            <strong style={{ textTransform: 'capitalize' }}>[{log.severity}] {log.type}</strong>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>{log.message}</p>
+                        <div key={log.id} style={{
+                          padding: '0.65rem 0.75rem',
+                          borderRadius: '6px',
+                          background: log.type === 'STATIONARY_1HR' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(2, 132, 199, 0.06)',
+                          borderLeft: log.type === 'STATIONARY_1HR' ? '4px solid #ef4444' : '4px solid #0284c7',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                            <strong style={{ color: log.type === 'STATIONARY_1HR' ? '#ef4444' : '#0284c7', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <AlertTriangle size={12} /> {log.title || log.type}
+                            </strong>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
                           </div>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', margin: 0 }}>{log.message}</p>
+                          {log.address && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                              📍 {log.address}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
@@ -1524,10 +1528,10 @@ export default function App() {
 
               </div>
 
-              {/* SECTION C & D: DAY-WISE DATE FILTERS & FLEET VEHICLE LIST TABLE */}
+              {/* SECTION C & D: DAY-WISE DATE FILTERS & FLEET VEHICLES LIST / GRID VIEW */}
               <div className="panel-container">
                 
-                {/* Day-Wise Filter Bar */}
+                {/* Day-Wise & List/Grid View Filter Bar */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
                   <div>
                     <span className="panel-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1540,7 +1544,50 @@ export default function App() {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    
+                    {/* Inline List View vs Grid View Switcher */}
+                    <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
+                      <button
+                        type="button"
+                        onClick={() => setFleetViewMode('list')}
+                        style={{
+                          padding: '0.35rem 0.65rem',
+                          fontSize: '0.72rem',
+                          borderRadius: '4px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: fleetViewMode === 'list' ? 'var(--accent-cyan)' : 'transparent',
+                          color: fleetViewMode === 'list' ? '#fff' : 'var(--text-secondary)',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        ≡ List View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFleetViewMode('grid')}
+                        style={{
+                          padding: '0.35rem 0.65rem',
+                          fontSize: '0.72rem',
+                          borderRadius: '4px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          backgroundColor: fleetViewMode === 'grid' ? 'var(--accent-cyan)' : 'transparent',
+                          color: fleetViewMode === 'grid' ? '#fff' : 'var(--text-secondary)',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <LayoutGrid size={12} /> Grid View
+                      </button>
+                    </div>
+
                     <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
                       {['today', 'yesterday', 'week', 'month', 'custom'].map((mode) => (
                         <button
@@ -1592,94 +1639,141 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Fleet Vehicle Table */}
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.05em' }}>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Tracker ID</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Tracker Name</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>User Name</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>MQTT Topic</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Current Location</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Status</th>
-                        <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredVehicles.length === 0 ? (
-                        <tr>
-                          <td colSpan="7" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                            No active hardware devices registered in database. Use <b>User Management</b> to register a device.
-                          </td>
+                {/* Fleet Vehicles View: List View vs Grid View */}
+                {fleetViewMode === 'list' ? (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.05em' }}>
+                          <th style={{ padding: '0.6rem 0.75rem' }}>Tracker ID</th>
+                          <th style={{ padding: '0.6rem 0.75rem' }}>Tracker Name</th>
+                          <th style={{ padding: '0.6rem 0.75rem' }}>User Name</th>
+                          <th style={{ padding: '0.6rem 0.75rem' }}>MQTT Topic</th>
+                          <th style={{ padding: '0.6rem 0.75rem' }}>Current Location</th>
+                          <th style={{ padding: '0.6rem 0.75rem' }}>Status</th>
+                          <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Action</th>
                         </tr>
-                      ) : (
-                        filteredVehicles.map((v) => {
-                          const t = telemetry[v.id] || {};
-                          const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
-                          const toAddr = t.fix && t.isOnline !== false ? (currentAddress[v.id] || 'Transmitting Data') : 'Location Unavailable';
-                          const isLive = t.isOnline !== false && (t.fix || t.lat);
+                      </thead>
+                      <tbody>
+                        {filteredVehicles.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              No active hardware devices registered in database. Use <b>User Management</b> to register a device.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredVehicles.map((v) => {
+                            const t = telemetry[v.id] || {};
+                            const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
+                            const toAddr = t.fix && t.isOnline !== false ? (currentAddress[v.id] || 'Transmitting Data') : 'Location Unavailable';
+                            const isLive = t.isOnline !== false && (t.fix || t.lat);
 
-                          return (
-                            <tr
-                              key={v.id}
-                              style={{
-                                borderBottom: '1px solid var(--border-color)',
-                                backgroundColor: 'transparent',
-                                transition: 'background-color 0.2s'
-                              }}
+                            return (
+                              <tr
+                                key={v.id}
+                                style={{
+                                  borderBottom: '1px solid var(--border-color)',
+                                  backgroundColor: 'transparent',
+                                  transition: 'background-color 0.2s'
+                                }}
+                              >
+                                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
+                                  {v.id}
+                                </td>
+                                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                                  {v.name}
+                                </td>
+                                <td style={{ padding: '0.65rem 0.75rem', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                  👤 {v.userName || mappedUser?.name || 'System Admin'}
+                                </td>
+                                <td style={{ padding: '0.65rem 0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#38bdf8' }}>
+                                  {v.topic || `sedhupathi/${v.id}/data`}
+                                </td>
+                                <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>
+                                  📍 {toAddr}
+                                </td>
+                                <td style={{ padding: '0.65rem 0.75rem' }}>
+                                  <span
+                                    style={{
+                                      backgroundColor: isLive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                      color: isLive ? 'var(--accent-green)' : 'var(--accent-red)',
+                                      fontWeight: 700,
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.7rem',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    {isLive ? '🟢 Online' : '🔴 Offline'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedVehicleId(v.id);
+                                      setActiveTab('tracking');
+                                    }}
+                                    className="action-btn"
+                                    style={{ padding: '0.3rem 0.65rem', fontSize: '0.7rem' }}
+                                  >
+                                    View Details
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="admin-fleet-grid">
+                    {filteredVehicles.map(v => {
+                      const tData = telemetry[v.id] || {};
+                      const isOff = tData.isOnline === false || tData.status === 'offline';
+                      return (
+                        <div key={v.id} className="fleet-card">
+                          <div className="fleet-card-header">
+                            <span className="fleet-card-title">
+                              📡 {v.name}
+                            </span>
+                            <span className={isOff ? 'badge-offline' : 'badge-online'}>
+                              {isOff ? '🔴 OFFLINE' : '🟢 LIVE GPS'}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)' }}>
+                            <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
+                            <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
+                            <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
+                            <div><strong>Coordinates:</strong> {!isOff && tData.lat ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Offline'}</div>
+                            <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
+                            <div><strong>Backup Battery:</strong> <span style={{ color: '#10b981', fontWeight: 700 }}>{tData.backupBatteryPercent || 100}%</span></div>
+                          </div>
+
+                          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => { setSelectedVehicleId(v.id); setActiveTab('tracking'); }}
+                              className="action-btn"
+                              style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                             >
-                              <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)' }}>
-                                {v.id}
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                                {v.name}
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', color: 'var(--accent-green)', fontWeight: 600 }}>
-                                👤 {v.userName || mappedUser?.name || 'System Admin'}
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#38bdf8' }}>
-                                {v.topic || `sedhupathi/${v.id}/data`}
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>
-                                📍 {toAddr}
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem' }}>
-                                <span
-                                  style={{
-                                    backgroundColor: isLive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                    color: isLive ? 'var(--accent-green)' : 'var(--accent-red)',
-                                    fontWeight: 700,
-                                    padding: '3px 8px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  {isLive ? '🟢 Online' : '🔴 Offline'}
-                                </span>
-                              </td>
-                              <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
-                                <button
-                                  onClick={() => {
-                                    setSelectedVehicleId(v.id);
-                                    setActiveTab('tracking');
-                                  }}
-                                  className="action-btn"
-                                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.7rem' }}
-                                >
-                                  View Details
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                              <Eye size={12} /> Focus on Map
+                            </button>
+                            <button
+                              onClick={() => { setSelectedVehicleId(v.id); setActiveTab('history'); fetchRouteHistory(v.id); }}
+                              className="action-btn secondary"
+                              style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                            >
+                              <Clock size={12} /> View History
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
               </div>
 
