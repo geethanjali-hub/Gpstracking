@@ -122,9 +122,19 @@ const openApiSpec = {
   }
 };
 
-// Serve OpenAPI Specification JSON
-app.get('/api-spec.json', (req, res) => {
-  res.json(openApiSpec);
+// Pure Backend Root Status API Endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    service: 'IBOTS GPS Telematics Backend API',
+    database: 'Firebase Cloud Database (ibots-gps)',
+    docs: '/docs',
+    endpoints: {
+      vehicles: '/api/vehicles',
+      telemetry: '/api/telemetry'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Swagger UI Dashboard Endpoint (Light Theme - available at /docs, /api-docs, /swagger)
