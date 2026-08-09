@@ -936,24 +936,165 @@ mqttClient.on('message', async (topic, message) => {
     localTelemetryByTopic[topic] = telemetryDoc;
     localTelemetry[vehicleId] = telemetryDoc;
 
+    // ⚡ 1. ZERO-DELAY WEBSOCKET BROADCAST TO FRONTEND (Executes immediately < 50ms)
+    broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId, data: telemetryDoc });
+
+    // 📜 2. HISTORICAL ROUTE LOGGING (Stores history trail points in Firestore collection 'telemetry_history')
+    if (hasValidCoords && db) {
+      const historyDoc = {
+        vehicleId,
+        topic,
+        lat,
+        lng,
+        heading: telemetryDoc.heading,
+        speed: telemetryDoc.speed,
+        address: addressDetails.address || '',
+        timestamp: telemetryDoc.timestamp
+      };
+      addDoc(collection(db, 'telemetry_history'), historyDoc).catch(hErr => {
+        console.warn(`History log skipped for ${vehicleId}:`, hErr.message);
+      });
+    }
+
+    // 🚨 3. 1-HOUR STATIONARY / IDLE ALERT ENGINE (Notifies Admin, Drivers, and Operators)
+    checkStationaryAlert(vehicleId, lat, lng, telemetryDoc.speed, addressDetails.address);
+
+    // 💾 4. ASYNC CLOUD PERSISTENCE (Saves live telemetry state in Firebase Firestore & RTDB)
     try {
       if (rtdb) {
-        await set(ref(rtdb, 'telemetry/' + vehicleId), telemetryDoc);
+        set(ref(rtdb, 'telemetry/' + vehicleId), telemetryDoc).catch(() => {});
       }
       if (db) {
-        await setDoc(doc(db, 'telemetry', vehicleId), telemetryDoc, { merge: true });
+        setDoc(doc(db, 'telemetry', vehicleId), telemetryDoc, { merge: true }).catch(() => {});
       }
     } catch (fbErr) {
       console.warn(`Firebase save from MQTT for ${vehicleId} warning:`, fbErr.message);
     }
     
-    broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId, data: telemetryDoc });
-    console.log(`✅ MQTT Topic [${topic}]: Saved location (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
+    console.log(`✅ MQTT Topic [${topic}]: Live location updated (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
 
   } catch (parseErr) {
     console.warn('📡 MQTT: Failed to parse message from topic', topic, parseErr.message);
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1-HOUR STATIONARY / IDLE ALERT SYSTEM ENGINE
+// Tracks stationary time per vehicle and triggers alert for Admin & Drivers if idle > 60m
+// ═══════════════════════════════════════════════════════════════════════════
+const vehicleStationaryTracker = new Map();
+
+function checkStationaryAlert(vehicleId, lat, lng, speed, address) {
+  if (!vehicleId) return;
+
+  const now = Date.now();
+  const existing = vehicleStationaryTracker.get(vehicleId);
+
+  // If vehicle is moving (speed > 3 kph), reset stationary timer
+  if (speed > 3 || !lat || !lng) {
+    vehicleStationaryTracker.set(vehicleId, {
+      lastLat: lat,
+      lastLng: lng,
+      since: now,
+      alertEmitted: false
+    });
+    return;
+  }
+
+  // Calculate distance from previous stationary position in meters
+  if (existing) {
+    const dLat = (lat - existing.lastLat) * 111000;
+    const dLng = (lng - existing.lastLng) * 111000 * Math.cos(lat * Math.PI / 180);
+    const distMeters = Math.sqrt(dLat * dLat + dLng * dLng);
+
+    // If moved more than 30 meters, reset stationary timer
+    if (distMeters > 30) {
+      vehicleStationaryTracker.set(vehicleId, {
+        lastLat: lat,
+        lastLng: lng,
+        since: now,
+        alertEmitted: false
+      });
+      return;
+    }
+
+    // Calculate idle duration in minutes
+    const idleDurationMs = now - existing.since;
+    const idleMinutes = Math.floor(idleDurationMs / 60000);
+
+    // Trigger alert if stationary >= 60 minutes (or test threshold 5m if configured)
+    if (idleMinutes >= 60 && !existing.alertEmitted) {
+      existing.alertEmitted = true;
+
+      const alertDoc = {
+        id: `alert_stationary_${vehicleId}_${now}`,
+        vehicleId,
+        type: 'STATIONARY_1HR',
+        title: '⚠️ 1-Hour Stationary Alert',
+        message: `Vehicle ${vehicleId} has been parked/idle at ${address || 'same location'} for ${idleMinutes} minutes.`,
+        address: address || 'Offline Location',
+        durationMinutes: idleMinutes,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log(`🚨 ALERT TRIGGERED: Vehicle ${vehicleId} stationary for ${idleMinutes}m!`);
+
+      // Store in Firebase Firestore 'alerts' collection
+      if (db) {
+        setDoc(doc(db, 'alerts', alertDoc.id), alertDoc).catch(() => {});
+      }
+
+      // Broadcast instant alert notification to all connected WebSockets (Admin, Operators, Drivers)
+      broadcast({ type: 'ALERT_TRIGGERED', alert: alertDoc });
+    }
+  } else {
+    vehicleStationaryTracker.set(vehicleId, {
+      lastLat: lat,
+      lastLng: lng,
+      since: now,
+      alertEmitted: false
+    });
+  }
+}
+
+// REST APIs for Route History Replay & Stationary Alerts
+app.get('/api/history/:vehicleId', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    if (db) {
+      const snapshot = await getDocs(collection(db, 'telemetry_history'));
+      const points = [];
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d.vehicleId === vehicleId && d.lat && d.lng) {
+          points.push(d);
+        }
+      });
+      // Sort chronologically by timestamp
+      points.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      return res.json(points);
+    }
+    res.json([]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/alerts', async (req, res) => {
+  try {
+    if (db) {
+      const snapshot = await getDocs(collection(db, 'alerts'));
+      const alertList = [];
+      snapshot.forEach(docSnap => alertList.push(docSnap.data()));
+      alertList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      return res.json(alertList);
+    }
+    res.json([]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -18,7 +18,15 @@ import {
   FileDown,
   Bell,
   Gauge,
-  CircleDot
+  CircleDot,
+  LayoutGrid,
+  Play,
+  Pause,
+  Clock,
+  Radio,
+  Navigation,
+  Eye,
+  CheckCircle2
 } from 'lucide-react';
 import Chart from 'chart.js/auto';
 import L from 'leaflet';
@@ -40,6 +48,49 @@ export default function App() {
   const [currentAddress, setCurrentAddress] = useState({});
   const [currentArea, setCurrentArea] = useState({});
   const [currentStreet, setCurrentStreet] = useState({});
+
+  // Route History & Replay State
+  const [historyTrail, setHistoryTrail] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const replayTimerRef = useRef(null);
+
+  // Fetch Route History Trail for selected vehicle
+  const fetchRouteHistory = async (vId) => {
+    if (!vId) return;
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/history/${vId}`);
+      if (res.ok) {
+        const pts = await res.json();
+        setHistoryTrail(pts);
+        setReplayIndex(0);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch route history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Fetch Live Alerts from Backend & Firebase
+  const fetchLiveAlerts = async () => {
+    try {
+      const res = await fetch('/api/alerts');
+      if (res.ok) {
+        const data = await res.json();
+        setAlerts(data);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch alerts:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveAlerts();
+  }, []);
+
 
   // Clean up legacy URL parameters without forced page reloads
   useEffect(() => {
@@ -620,6 +671,9 @@ export default function App() {
             if (payload.vehicleId && payload.data) {
               applyTelemetryUpdate(payload.vehicleId, payload.data);
             }
+          } else if (payload.type === 'ALERT_TRIGGERED' && payload.alert) {
+            setAlerts(prev => [payload.alert, ...prev]);
+            console.log("🚨 REALTIME ALERT RECEIVED:", payload.alert);
           }
         };
       }
@@ -687,9 +741,11 @@ export default function App() {
       const map = L.map(container, { zoomControl: false }).setView(centerCoords, hasValidCoords ? 16 : 13);
       mapInstanceRef.current = map;
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19
+      // Google Maps Vector-Style Vector Tiles (CARTO Voyager Theme)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20
       }).addTo(map);
 
       L.control.zoom({ position: 'topright' }).addTo(map);
@@ -1148,19 +1204,27 @@ export default function App() {
               </span>
             </li>
             {role !== 'viewer' && (
-              <>
-                <li>
-                  <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                    <Compass size={14} /> Engine Health
-                  </span>
-                </li>
-                <li>
-                  <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                    <CircleDot size={14} /> Fuel Monitoring
-                  </span>
-                </li>
-              </>
+              <li>
+                <span className={`nav-link ${activeTab === 'grid' ? 'active' : ''}`} onClick={() => setActiveTab('grid')}>
+                  <LayoutGrid size={14} style={{ color: 'var(--accent-cyan)' }} /> Admin Fleet Grid
+                </span>
+              </li>
             )}
+            <li>
+              <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
+                <Clock size={14} style={{ color: '#8b5cf6' }} /> Route History Replay
+              </span>
+            </li>
+            <li>
+              <span className={`nav-link ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
+                <AlertTriangle size={14} style={{ color: '#ef4444' }} /> 1-Hour Idle Alerts
+                {alerts.length > 0 && (
+                  <span style={{ marginLeft: 'auto', backgroundColor: '#ef4444', color: '#fff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px' }}>
+                    {alerts.length}
+                  </span>
+                )}
+              </span>
+            </li>
             <li>
               <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                 <Battery size={14} /> Backup Battery Status
@@ -1818,6 +1882,193 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ADMIN FLEET GRID VIEW TAB */}
+          {activeTab === 'grid' && (
+            <div className="panel-container">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <LayoutGrid size={18} style={{ color: 'var(--accent-cyan)' }} /> Admin Multi-Vehicle Fleet Grid
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Real-time status overview across all active hardware trackers in the fleet database.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span className="badge-online">🟢 {vehicles.filter(v => telemetry[v.id]?.isOnline !== false).length} Online</span>
+                  <span className="badge-offline">🔴 {vehicles.filter(v => telemetry[v.id]?.isOnline === false || telemetry[v.id]?.status === 'offline').length} Offline</span>
+                </div>
+              </div>
+
+              <div className="admin-fleet-grid">
+                {vehicles.map(v => {
+                  const tData = telemetry[v.id] || {};
+                  const isOff = tData.isOnline === false || tData.status === 'offline';
+                  return (
+                    <div key={v.id} className="fleet-card">
+                      <div className="fleet-card-header">
+                        <span className="fleet-card-title">
+                          📡 {v.name}
+                        </span>
+                        <span className={isOff ? 'badge-offline' : 'badge-online'}>
+                          {isOff ? '🔴 OFFLINE' : '🟢 LIVE GPS'}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)' }}>
+                        <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
+                        <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
+                        <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
+                        <div><strong>Coordinates:</strong> {!isOff && tData.lat ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Offline'}</div>
+                        <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
+                        <div><strong>Backup Battery:</strong> <span style={{ color: '#10b981', fontWeight: 700 }}>{tData.backupBatteryPercent || 100}%</span></div>
+                      </div>
+
+                      <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => { setSelectedVehicleId(v.id); setActiveTab('tracking'); }}
+                          className="action-btn"
+                          style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                        >
+                          <Eye size={12} /> Focus on Map
+                        </button>
+                        <button
+                          onClick={() => { setSelectedVehicleId(v.id); setActiveTab('history'); fetchRouteHistory(v.id); }}
+                          className="action-btn secondary"
+                          style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                        >
+                          <Clock size={12} /> View History
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ROUTE HISTORY REPLAY TAB */}
+          {activeTab === 'history' && (
+            <div className="panel-container">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Clock size={18} style={{ color: '#8b5cf6' }} /> Route History Trail & Playback Replay
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Replay exact historical travel paths stored in Firebase Firestore <span style={{ fontFamily: 'var(--font-mono)' }}>telemetry_history</span>.
+                  </p>
+                </div>
+                <button
+                  onClick={() => fetchRouteHistory(selectedVehicleId)}
+                  className="action-btn"
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                >
+                  🔄 Refresh Trail
+                </button>
+              </div>
+
+              {historyLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  ⏳ Loading historical GPS trail data from Firebase Firestore...
+                </div>
+              ) : historyTrail.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  📜 No historical route points recorded yet for vehicle <strong>{selectedVehicleId}</strong>. As physical GPS hardware streams live coordinates, history points will automatically log here!
+                </div>
+              ) : (
+                <div>
+                  <div className="replay-controls-bar">
+                    <button
+                      onClick={() => setIsReplaying(!isReplaying)}
+                      className="action-btn"
+                      style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      {isReplaying ? <Pause size={14} /> : <Play size={14} />}
+                      {isReplaying ? 'Pause Replay' : 'Start Playback'}
+                    </button>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      Point {replayIndex + 1} of {historyTrail.length}
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max={historyTrail.length - 1}
+                      value={replayIndex}
+                      onChange={(e) => setReplayIndex(Number(e.target.value))}
+                      style={{ flex: 1, cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                      {historyTrail[replayIndex]?.timestamp ? new Date(historyTrail[replayIndex].timestamp).toLocaleTimeString() : ''}
+                    </span>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1rem' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--accent-cyan)' }}>
+                      📍 Playback Position Details:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', fontSize: '0.78rem' }}>
+                      <div><strong>Latitude:</strong> {historyTrail[replayIndex]?.lat?.toFixed(5)}</div>
+                      <div><strong>Longitude:</strong> {historyTrail[replayIndex]?.lng?.toFixed(5)}</div>
+                      <div><strong>Speed:</strong> {historyTrail[replayIndex]?.speed || 0} km/h</div>
+                      <div><strong>Address:</strong> {historyTrail[replayIndex]?.address || 'Locating...'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 1-HOUR STATIONARY IDLE ALERTS TAB */}
+          {activeTab === 'alerts' && (
+            <div className="panel-container">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <AlertTriangle size={18} style={{ color: '#ef4444' }} /> 1-Hour Stationary & Idle Alert Center
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Real-time notifications sent to Admins, Operators, and Drivers when a vehicle remains stationary for &gt;= 60 minutes.
+                  </p>
+                </div>
+                <button onClick={fetchLiveAlerts} className="action-btn secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>
+                  🔄 Refresh Alerts
+                </button>
+              </div>
+
+              {alerts.length === 0 ? (
+                <div style={{ padding: '2.5rem', textAlign: 'center', color: '#10b981', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                  <CheckCircle2 size={32} style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                  <strong>All Clear! No Stationary or Idle Alerts Triggered</strong>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Vehicles are moving actively or within normal operation limits.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {alerts.map(a => (
+                    <div key={a.id} style={{ background: 'rgba(239, 68, 68, 0.06)', borderLeft: '4px solid #ef4444', borderRadius: '8px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ color: '#ef4444', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <AlertTriangle size={14} /> {a.title || '1-Hour Stationary Alert'}
+                        </strong>
+                        <div style={{ fontSize: '0.8rem', marginTop: '0.25rem', color: 'var(--text-primary)' }}>
+                          {a.message}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                          📍 Location: {a.address} | Duration: <strong>{a.durationMinutes || 60} mins</strong>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+                        {new Date(a.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
