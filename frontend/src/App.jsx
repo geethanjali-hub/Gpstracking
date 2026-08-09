@@ -585,6 +585,31 @@ export default function App() {
     }
   };
 
+  // Trigger Manual Test SMS over MQTT for ESP32 GSM module
+  const handleTestSms = async (e) => {
+    if (e) e.preventDefault();
+    if (!smsTargetVehicleId) {
+      alert("Please select a target device first.");
+      return;
+    }
+    try {
+      const res = await fetch('/api/control/test-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicleId: smsTargetVehicleId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`📲 Test SMS Trigger Dispatched over MQTT!\n\nTarget Numbers (${data.phoneNumbers?.length}): ${data.phoneNumbers?.join(', ')}\nMQTT Topic: [${data.topic}]\n\nYour ESP32 GSM module will now fire AT commands to send the SMS!`);
+      } else {
+        alert(`Failed to send test SMS: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error triggering test SMS.");
+    }
+  };
+
   // Add New System User & Map Device / MQTT Topic / Broker
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -2741,9 +2766,14 @@ export default function App() {
                         <input type="tel" className="form-input" placeholder="e.g. +919876543214" value={smsPhone5} onChange={e => setSmsPhone5(e.target.value)} />
                       </div>
 
-                      <button type="submit" className="action-btn" style={{ marginTop: '0.4rem', backgroundColor: 'var(--accent-orange)', color: '#000', fontWeight: 800 }}>
-                        📲 Save & Sync SMS Numbers to ESP32
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                        <button type="submit" className="action-btn" style={{ flex: 1, backgroundColor: 'var(--accent-orange)', color: '#000', fontWeight: 800 }}>
+                          💾 Save & Sync SMS Numbers
+                        </button>
+                        <button type="button" onClick={handleTestSms} className="action-btn" style={{ flex: 1, backgroundColor: 'var(--accent-cyan)', color: '#000', fontWeight: 800 }}>
+                          📲 Send Test SMS Now
+                        </button>
+                      </div>
                     </form>
                   </div>
 

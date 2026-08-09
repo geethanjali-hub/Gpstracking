@@ -867,6 +867,46 @@ app.delete('/api/telemetry', async (req, res) => {
   }
 });
 
+// 📲 Manual Test SMS Trigger Endpoint over MQTT for ESP32 GSM Module
+app.post('/api/control/test-sms', (req, res) => {
+  try {
+    const { vehicleId } = req.body;
+    if (!vehicleId) return res.status(400).json({ error: 'vehicleId is required' });
+
+    const vehicle = localVehicles.find(v => v.id === vehicleId);
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+
+    const targetPhones = vehicle.phoneNumbers || [];
+    if (targetPhones.length === 0) {
+      return res.status(400).json({ error: 'No emergency phone numbers configured for this vehicle. Please add phone numbers first.' });
+    }
+
+    const cmdTopic = `sedhupathi/${vehicleId}/config`;
+    const testSmsPayload = JSON.stringify({
+      cmd: "SEND_SMS_ALERT",
+      vehicleId,
+      alertType: "TEST_SMS",
+      message: `TEST ALERT: Armstrong GPS Emergency SMS System test for ${vehicle.name} (${vehicleId}).`,
+      phone_numbers: targetPhones,
+      timestamp: new Date().toISOString()
+    });
+
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish(cmdTopic, testSmsPayload, { qos: 1 });
+      console.log(`📱 MQTT: Dispatched Manual Test SMS trigger to topic [${cmdTopic}] for ${targetPhones.length} numbers:`, targetPhones);
+    }
+
+    res.json({
+      status: 'ok',
+      message: `Test SMS command sent over MQTT for ${targetPhones.length} phone numbers (${targetPhones.join(', ')})`,
+      phoneNumbers: targetPhones,
+      topic: cmdTopic
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 
