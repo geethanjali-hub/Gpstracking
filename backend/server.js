@@ -73,6 +73,13 @@ const openApiSpec = {
       }
     },
     "/api/telemetry": {
+      get: {
+        summary: "Get Live Fleet Telemetry & Online/Offline Status",
+        description: "Returns live telemetry snapshots for all active vehicles, including coordinates, online/offline status, battery level, and speed.",
+        responses: {
+          "200": { description: "Dictionary of vehicle telemetry objects keyed by vehicleId" }
+        }
+      },
       post: {
         summary: "Push Hardware Telemetry Packet",
         description: "Endpoint used by ESP32 / SIM A7670C hardware tracker to push live 5-second telemetry payloads.",
@@ -82,12 +89,12 @@ const openApiSpec = {
               schema: {
                 type: "object",
                 properties: {
-                  device_id: { type: "string", example: "V-001" },
+                  device_id: { type: "string", example: "gps-obd-tracker-01" },
                   gps: {
                     type: "object",
                     properties: {
-                      lat: { type: "number", example: 37.7749 },
-                      lng: { type: "number", example: -122.4194 },
+                      lat: { type: "number", example: 11.00659 },
+                      lng: { type: "number", example: 77.01404 },
                       spd: { type: "number", example: 55 },
                       hdg: { type: "number", example: 90 },
                       sats: { type: "number", example: 10 }
@@ -98,15 +105,7 @@ const openApiSpec = {
                     properties: {
                       rpm: { type: "number", example: 1800 },
                       coolant_c: { type: "number", example: 88 },
-                      fuel_pct: { type: "number", example: 78.5 },
-                      mil: { type: "boolean", example: false }
-                    }
-                  },
-                  power: {
-                    type: "object",
-                    properties: {
-                      bat_pct: { type: "number", example: 100 },
-                      obd_12v: { type: "boolean", example: true }
+                      fuel_pct: { type: "number", example: 78.5 }
                     }
                   }
                 }
@@ -116,6 +115,51 @@ const openApiSpec = {
         },
         responses: {
           "200": { description: "Telemetry received and broadcasted" }
+        }
+      }
+    },
+    "/api/telemetry/{vehicleId}": {
+      get: {
+        summary: "Get Single Vehicle Live Telemetry",
+        description: "Returns live telemetry object for a specific vehicle ID.",
+        parameters: [
+          {
+            name: "vehicleId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            example: "gps-obd-tracker-01"
+          }
+        ],
+        responses: {
+          "200": { description: "Live telemetry object for specified vehicle" }
+        }
+      }
+    },
+    "/api/history/{vehicleId}": {
+      get: {
+        summary: "Get Vehicle Route History",
+        description: "Returns historical GPS trail coordinates logged in Firestore telemetry_history.",
+        parameters: [
+          {
+            name: "vehicleId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            example: "gps-obd-tracker-01"
+          }
+        ],
+        responses: {
+          "200": { description: "Array of historical route GPS points" }
+        }
+      }
+    },
+    "/api/alerts": {
+      get: {
+        summary: "Get Active Stationary & System Alerts",
+        description: "Returns list of active 1-hour stationary alerts and system notifications.",
+        responses: {
+          "200": { description: "Array of alert objects" }
         }
       }
     }
