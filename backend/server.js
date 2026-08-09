@@ -948,8 +948,9 @@ app.post('/api/webhook/deploy', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 const MQTT_BROKER_URL = 'mqtt://test.mosquitto.org:1883';
 const MQTT_TOPICS = [
-  'sedhupathi/gps-obd-tracker-01/data',  // main tracker device
-  'sedhupathi/+/data'                     // wildcard for future devices
+  'sedhupathi/#',                         // Multi-level wildcard for ALL devices & topics under sedhupathi/
+  'sedhupathi/+/data',
+  'sedhupathi/+'
 ];
 
 const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
@@ -962,7 +963,7 @@ mqttClient.on('connect', () => {
   console.log('📡 MQTT: Connected to', MQTT_BROKER_URL);
   MQTT_TOPICS.forEach(topic => {
     mqttClient.subscribe(topic, (err) => {
-      if (!err) console.log('📡 MQTT: Subscribed to', topic);
+      if (!err) console.log('📡 MQTT: Subscribed to wildcard topic:', topic);
       else console.warn('📡 MQTT: Subscribe failed for', topic, err.message);
     });
   });
@@ -979,16 +980,28 @@ mqttClient.on('reconnect', () => {
 // Process incoming MQTT messages from ESP32 hardware (extracts location based on topic name alone)
 mqttClient.on('message', async (topic, message) => {
   try {
+    // Skip backend command/number topics to prevent self-looping
+    if (topic.endsWith('/number') || topic.endsWith('/config') || topic.endsWith('/cmd')) {
+      return;
+    }
+
     const raw = JSON.parse(message.toString());
-    console.log(`📡 MQTT: Received from topic [${topic}]`);
+    console.log(`📡 MQTT: Received live telemetry from topic [${topic}]`);
 
     // Extract device/tracker name strictly from topic path: e.g. "sedhupathi/tracker-01/data" -> "tracker-01"
     const topicParts = topic.split('/');
     const deviceFromTopic = (topicParts.length >= 2 && topicParts[1] !== '+') 
       ? topicParts[1] 
       : topic.replace(/\//g, '_');
-      
-    const vehicleId = deviceFromTopic || topic.replace(/\//g, '_');
+
+    // Intelligent Vehicle Matching: Match with registered vehicle in database by ID or Topic
+    const matchedVehicle = localVehicles.find(v => 
+      v.topic === topic || 
+      v.id === deviceFromTopic || 
+      v.id === topicParts[1] || 
+      (v.topic && v.topic.includes(deviceFromTopic))
+    );
+    const vehicleId = matchedVehicle ? matchedVehicle.id : deviceFromTopic;
 
 
     // Track device liveness timestamp strictly by topic & vehicleId
