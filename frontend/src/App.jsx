@@ -419,43 +419,7 @@ export default function App() {
       const dSum = await resSum.json();
       setDailySummary(dSum);
     } catch (err) {
-      // Only generate fallback mock data ONCE — do not call again on interval
-      if (chartsHistory.length === 0) {
-        const mockHistory = [];
-        const mockShock = [];
-        const timeNow = Date.now();
-        // Fixed values — no Math.random() so the chart stays stable
-        const rpmBase =    [1500,1520,1550,1490,1600,1580,1530,1510,1540,1560,1570,1545,1525,1505,1535,1555,1565,1580,1590,1600,1610];
-        const tempBase =   [80,81,82,81,83,84,83,82,82,83,84,85,84,83,82,83,84,85,86,85,84];
-        const speedBase =  [40,42,45,43,50,48,46,44,47,49,51,50,48,46,47,49,50,52,53,51,50];
-        for (let i = 20; i >= 0; i--) {
-          const idx = 20 - i;
-          const timeStr = new Date(timeNow - i * 30000).toLocaleTimeString();
-          mockHistory.push({
-            time: timeStr,
-            speed: speedBase[idx],
-            rpm: rpmBase[idx],
-            coolantTemp: tempBase[idx],
-            fuelLevel: Math.max(10, 80 - idx * 0.2),
-            backupBattery: 100
-          });
-          mockShock.push({
-            time: timeStr,
-            g: 0.95 + (idx % 3 === 0 ? 0.05 : 0),
-            limit: 2.5
-          });
-        }
-        setChartsHistory(mockHistory);
-        setShockDataList(mockShock);
-        setDailySummary({
-          mileageHistory: [
-            { day: 'Mon', km: 120 }, { day: 'Tue', km: 145 }, { day: 'Wed', km: 110 },
-            { day: 'Thu', km: 160 }, { day: 'Fri', km: 135 }, { day: 'Sat', km: 90 }, { day: 'Sun', km: 45 }
-          ],
-          hoursSummary: { running: 6.8, idle: 1.5, parked: 15.7 },
-          deviationCount: 2
-        });
-      }
+      console.warn("Telemetry history chart fetch note:", err.message);
     }
   };
 
