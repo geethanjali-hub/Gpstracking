@@ -839,37 +839,51 @@ app.post('/api/vehicles', async (req, res) => {
 app.delete('/api/vehicles/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const targetId = decodeURIComponent(id);
+    const targetId = decodeURIComponent(id).trim();
 
-    // Delete directly from Firebase Firestore ('vehicles', 'telemetry', and 'telemetry_history' collections)
-    try {
-      if (db) {
-        await deleteDoc(doc(db, 'vehicles', targetId));
-        await deleteDoc(doc(db, 'telemetry', targetId));
+    console.log(`🗑️ DELETE /api/vehicles request received for ID/Name: "${targetId}"`);
 
-        // Delete any matching docs by ID or Name in vehicles collection
+    // 1. Delete directly from Firebase Firestore ('vehicles', 'telemetry', and 'telemetry_history' collections)
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'vehicles', targetId)).catch(() => {});
+        await deleteDoc(doc(db, 'telemetry', targetId)).catch(() => {});
+
+        // Delete any matching docs in 'vehicles' collection by doc.id, v.id, or v.name
         const snapshot = await getDocs(collection(db, 'vehicles'));
         for (const dSnap of snapshot.docs) {
-          const vData = dSnap.data();
-          if (vData.id === targetId || vData.id === id || vData.name === targetId) {
-            await deleteDoc(dSnap.ref);
+          const vData = dSnap.data() || {};
+          if (
+            dSnap.id === targetId || 
+            vData.id === targetId || 
+            vData.name === targetId ||
+            (vData.id && vData.id.toLowerCase() === targetId.toLowerCase()) ||
+            (vData.name && vData.name.toLowerCase() === targetId.toLowerCase())
+          ) {
+            await deleteDoc(dSnap.ref).catch(() => {});
+            console.log(`🗑️ Deleted Firestore document: ${dSnap.id}`);
           }
         }
+      } catch (fbErr) {
+        console.warn("⚠️ Firebase Firestore delete warning:", fbErr.message);
       }
-      console.log(`🗑️ Deleted vehicle "${targetId}" directly from Firebase Firestore Cloud Database ('vehicles')`);
-    } catch (fbErr) {
-      console.warn("⚠️ Firebase Firestore delete warning:", fbErr.message);
     }
 
-    localVehicles = localVehicles.filter(v => v.id !== targetId && v.id !== id && v.name !== targetId);
+    // 2. Remove from local memory arrays & disk database file
+    localVehicles = localVehicles.filter(v => 
+      v.id !== targetId && 
+      v.name !== targetId && 
+      (!v.id || v.id.toLowerCase() !== targetId.toLowerCase())
+    );
     delete localTelemetry[targetId];
-    delete localTelemetry[id];
     delete localTelemetryByTopic[targetId];
     saveDatabase(localVehicles);
 
+    // 3. Broadcast deletion event to connected WebSockets
     broadcast({ type: 'VEHICLE_DELETED', vehicleId: targetId });
     res.json({ status: 'ok', message: `Device ${targetId} permanently deleted from database.` });
   } catch (err) {
+    console.error("❌ Delete vehicle error:", err);
     res.status(500).json({ error: err.message });
   }
 });

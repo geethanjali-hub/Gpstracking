@@ -662,13 +662,18 @@ export default function App() {
   };
 
   // Delete Vehicle / Device & Associated User Mapping permanently from DB
-  const handleDeleteVehicle = async (vId) => {
+  const handleDeleteVehicle = async (vIdInput) => {
+    const vId = typeof vIdInput === 'object' ? vIdInput?.id : vIdInput;
+    if (!vId) return;
+
     if (!window.confirm(`Are you sure you want to permanently delete device "${vId}" from the database?`)) {
       return;
     }
 
     try {
       const res = await fetch(`${API_BASE}/api/vehicles/${encodeURIComponent(vId)}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
         setTelemetry(prev => {
           const updated = { ...prev };
@@ -680,12 +685,13 @@ export default function App() {
         setSystemUsers(prev => prev.filter(u => u.assignedVehicle !== vId));
         setSelectedVehicleId(remaining[0]?.id || '');
         alert(`🗑️ Successfully deleted device "${vId}" permanently from Database.`);
+        await fetchVehicles();
       } else {
-        alert(`Failed to delete device "${vId}" from server database.`);
+        alert(`Failed to delete device "${vId}": ${data.error || 'Server error'}`);
       }
     } catch (err) {
       console.error("Backend delete vehicle error:", err);
-      alert(`Error deleting device "${vId}" from database.`);
+      alert(`Error deleting device "${vId}" from database: ${err.message}`);
     }
   };
 
