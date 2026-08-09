@@ -34,6 +34,95 @@ import 'leaflet/dist/leaflet.css';
 import { subscribeToTelemetry } from './firebase';
 import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getRefreshToken, refreshAccessToken, getUserProfile, authFetch, API_BASE } from './api';
 
+function FleetCardMiniMap({ vehicle, telemetryData }) {
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+
+  const isOff = telemetryData.isOnline === false || telemetryData.status === 'offline';
+  const hasCoords = typeof telemetryData.lat === 'number' && typeof telemetryData.lng === 'number' && !isNaN(telemetryData.lat) && telemetryData.lat !== 0;
+  const lat = hasCoords ? telemetryData.lat : 11.02366;
+  const lng = hasCoords ? telemetryData.lng : 76.9424;
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+
+    if (container._leaflet_id) {
+      delete container._leaflet_id;
+    }
+
+    const map = L.map(container, {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: !L.Browser.mobile,
+      tap: false
+    }).setView([lat, lng], hasCoords ? 15 : 12);
+
+    mapInstanceRef.current = map;
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    const iconHtml = `<div style="
+      width: 32px; height: 32px;
+      background: ${isOff ? '#ef4444' : '#0284c7'};
+      border: 2.5px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 12px ${isOff ? 'rgba(239,68,68,0.7)' : 'rgba(2,132,199,0.7)'};
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; color: white;
+    ">📡</div>`;
+
+    const customIcon = L.divIcon({
+      html: iconHtml,
+      className: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+
+    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+    marker.bindPopup(`
+      <div style="font-family: sans-serif; font-size: 12px; color: #0f172a; padding: 2px;">
+        <strong style="color: #0284c7;">${vehicle.name}</strong><br/>
+        <b>Status:</b> ${isOff ? '🔴 Offline' : '🟢 Live GPS'}<br/>
+        <b>Speed:</b> ${telemetryData.speed || 0} km/h
+      </div>
+    `);
+    markerRef.current = marker;
+
+    setTimeout(() => {
+      if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+    }, 250);
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [vehicle.id]);
+
+  useEffect(() => {
+    if (mapInstanceRef.current && hasCoords) {
+      mapInstanceRef.current.setView([lat, lng], 15);
+      if (markerRef.current) {
+        markerRef.current.setLatLng([lat, lng]);
+      }
+    }
+  }, [lat, lng, hasCoords]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '190px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', margin: '0.65rem 0' }}>
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
+      <div style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 10, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(4px)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.68rem', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)' }}>
+        📍 {hasCoords ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Location Offline'}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(getAccessToken() || null);
   const [role, setRole] = useState(getUserProfile()?.role || localStorage.getItem('role') || 'viewer');
@@ -2062,30 +2151,31 @@ export default function App() {
                         </span>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.75rem 0', background: 'rgba(255,255,255,0.02)', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      {/* Interactive Mini-Map Component for each vehicle card */}
+                      <FleetCardMiniMap vehicle={v} telemetryData={tData} />
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                         <div>
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Device Speed</span>
-                          <div style={{ fontSize: '1rem', fontWeight: 800, color: isOff ? 'var(--text-muted)' : 'var(--accent-cyan)' }}>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: isOff ? 'var(--text-muted)' : 'var(--accent-cyan)' }}>
                             {isOff ? '0 km/h' : `${tData.speed || 0} km/h`}
                           </div>
                         </div>
                         <div>
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Backup Battery</span>
-                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#10b981' }}>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#10b981' }}>
                             {tData.backupBatteryPercent || 100}%
                           </div>
                         </div>
                       </div>
 
-                      <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', color: 'var(--text-secondary)' }}>
                         <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
                         <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
-                        <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
-                        <div><strong>Coordinates:</strong> {!isOff && tData.lat ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Location Offline'}</div>
                         <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
                       </div>
 
-                      <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                      <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={() => { setSelectedVehicleId(v.id); setActiveTab('tracking'); }}
                           className="action-btn"

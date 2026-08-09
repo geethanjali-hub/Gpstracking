@@ -1036,6 +1036,39 @@ const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
   reconnectPeriod: 5000
 });
 
+// 📱 CONTINUOUS RECURRING MQTT SYNC ENGINE
+// Re-broadcasts all configured Emergency Phone Numbers to MQTT every 15s so broker never loses them
+function broadcastAllVehicleNumbersMQTT() {
+  if (!mqttClient || !mqttClient.connected) return;
+
+  localVehicles.forEach(vehicle => {
+    const vId = vehicle.id;
+    const phoneNumbers = vehicle.phoneNumbers || [];
+    const smsAlertStatus = (vehicle.smsAlertStatus || 'ON').toUpperCase();
+
+    if (vId && phoneNumbers.length > 0) {
+      const numberTopic1 = `ibots/tracker/${vId}/number`;
+      const numberTopic2 = `sedhupathi/${vId}/number`;
+
+      const payload = JSON.stringify({
+        tracker_id: vId,
+        alert_status: smsAlertStatus,
+        numbers: phoneNumbers,
+        phone_numbers: phoneNumbers,
+        timestamp: new Date().toISOString()
+      });
+
+      mqttClient.publish(numberTopic1, payload, { qos: 1, retain: true });
+      mqttClient.publish(numberTopic2, payload, { qos: 1, retain: true });
+      mqttClient.publish(`sedhupathi/${vId}/config`, payload, { qos: 1, retain: true });
+      mqttClient.publish(`ibots/tracker/${vId}/config`, payload, { qos: 1, retain: true });
+    }
+  });
+}
+
+// Continuously re-publish emergency numbers every 15 seconds
+setInterval(broadcastAllVehicleNumbersMQTT, 15000);
+
 mqttClient.on('connect', () => {
   console.log('📡 MQTT: Connected to', MQTT_BROKER_URL);
   MQTT_TOPICS.forEach(topic => {
@@ -1044,6 +1077,8 @@ mqttClient.on('connect', () => {
       else console.warn('📡 MQTT: Subscribe failed for', topic, err.message);
     });
   });
+  // Immediately sync all emergency phone numbers to MQTT broker on connect
+  broadcastAllVehicleNumbersMQTT();
 });
 
 mqttClient.on('error', (err) => {
@@ -1052,6 +1087,7 @@ mqttClient.on('error', (err) => {
 
 mqttClient.on('reconnect', () => {
   console.log('📡 MQTT: Reconnecting...');
+  broadcastAllVehicleNumbersMQTT();
 });
 
 // Process incoming MQTT messages from ESP32 & Quectel EC200U hardware
