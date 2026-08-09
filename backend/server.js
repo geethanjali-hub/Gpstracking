@@ -165,7 +165,7 @@ app.get(['/docs', '/api-docs', '/swagger'], (req, res) => {
     <body>
       <div class="topbar-header">
         <h1>⚡ IBOTS GPS Telematics Backend — Interactive API Console</h1>
-        <a href="http://64.227.179.37/gps-app/" class="btn-ui" target="_blank">Launch Web Dashboard ➔</a>
+        <a href="https://gpstracking-zeta.vercel.app/" class="btn-ui" target="_blank">Launch Web Dashboard ➔</a>
       </div>
       <div id="swagger-ui"></div>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-bundle.js"></script>
@@ -173,7 +173,7 @@ app.get(['/docs', '/api-docs', '/swagger'], (req, res) => {
       <script>
       window.onload = function() {
         window.ui = SwaggerUIBundle({
-          url: "/api-spec.json",
+          url: window.location.origin + "/api-spec.json",
           dom_id: '#swagger-ui',
           deepLinking: true,
           presets: [
