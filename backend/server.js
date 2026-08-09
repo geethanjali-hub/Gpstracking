@@ -582,7 +582,33 @@ app.get('/api/telemetry', (req, res) => {
     const data = localTelemetryByTopic[queryTopic] || Object.values(localTelemetry).find(t => t.topic === queryTopic);
     return res.json(data || { error: 'No telemetry found for specified topic', topic: queryTopic });
   }
-  res.json(localTelemetry);
+
+  // Build merged map: registered vehicles + live MQTT data
+  // Devices that have NEVER received an MQTT packet are shown as OFFLINE with null location
+  const activeVehicles = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
+  const mergedTelemetry = {};
+  activeVehicles.forEach(v => {
+    const live = localTelemetry[v.id] || localTelemetryByTopic[v.topic];
+    if (live) {
+      mergedTelemetry[v.id] = live;
+    } else {
+      // No MQTT packet ever received — mark strictly as OFFLINE with no location
+      mergedTelemetry[v.id] = {
+        vehicleId: v.id,
+        vehicleName: v.name,
+        topic: v.topic,
+        isOnline: false,
+        status: 'offline',
+        lat: null,
+        lng: null,
+        address: 'No Signal — Device Offline',
+        speed: 0,
+        satellites: 0,
+        lastSeen: null
+      };
+    }
+  });
+  res.json(mergedTelemetry);
 });
 
 app.get('/api/telemetry/by-topic', (req, res) => {
@@ -599,7 +625,24 @@ app.get('/api/telemetry/by-topic', (req, res) => {
 
 app.get('/api/telemetry/:vehicleId', (req, res) => {
   const vid = req.params.vehicleId;
-  res.json(localTelemetry[vid] || localTelemetryByTopic[vid] || localTelemetry['gps-obd-tracker-01'] || {});
+  // NEVER fall back to another device's data — return OFFLINE if no live MQTT packet received
+  const live = localTelemetry[vid] || localTelemetryByTopic[vid];
+  if (live) return res.json(live);
+  // Find the registered vehicle to return correct offline stub
+  const registeredVehicle = localVehicles.find(v => v.id === vid);
+  res.json({
+    vehicleId: vid,
+    vehicleName: registeredVehicle?.name || vid,
+    topic: registeredVehicle?.topic || null,
+    isOnline: false,
+    status: 'offline',
+    lat: null,
+    lng: null,
+    address: 'No Signal — Device Offline',
+    speed: 0,
+    satellites: 0,
+    lastSeen: null
+  });
 });
 
 
