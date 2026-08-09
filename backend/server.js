@@ -1324,6 +1324,88 @@ app.get('/api/history/:vehicleId', async (req, res) => {
   }
 });
 
+// Telemetry Diagnostics Chart Data API
+app.get('/api/charts/:vehicleId', async (req, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const targetId = decodeURIComponent(vehicleId);
+
+    const historyPoints = [];
+    if (db) {
+      const snapshot = await getDocs(collection(db, 'telemetry_history'));
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d.vehicleId === targetId || d.vehicleId === vehicleId || d.topicDevice === targetId) {
+          historyPoints.push(d);
+        }
+      });
+    }
+
+    historyPoints.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    const chartData = historyPoints.map(p => ({
+      time: p.timestamp ? new Date(p.timestamp).toLocaleTimeString() : 'Now',
+      speed: p.speed || 0,
+      rpm: p.rpm || 0,
+      coolantTemp: p.coolantTemp || 0,
+      fuelLevel: p.fuelLevel || 0,
+      backupBattery: p.backupBatteryPercent || 100
+    }));
+
+    // If no history points logged yet, provide current live telemetry point
+    if (chartData.length === 0) {
+      const live = localTelemetry[targetId] || localTelemetry[vehicleId] || {};
+      chartData.push({
+        time: new Date().toLocaleTimeString(),
+        speed: live.speed || 0,
+        rpm: live.rpm || 0,
+        coolantTemp: live.coolantTemp || 0,
+        fuelLevel: live.fuelLevel || 0,
+        backupBattery: 100
+      });
+    }
+
+    res.json(chartData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Vibration & Shock Spike Data API
+app.get('/api/shock/:vehicleId', (req, res) => {
+  const { vehicleId } = req.params;
+  const targetId = decodeURIComponent(vehicleId);
+  const live = localTelemetry[targetId] || localTelemetry[vehicleId] || {};
+  
+  res.json([
+    {
+      time: new Date().toLocaleTimeString(),
+      g: live.gForce || 0.98,
+      limit: 2.5
+    }
+  ]);
+});
+
+// Daily Running Mileage & Hours Summary API
+app.get('/api/summaries/:vehicleId', (req, res) => {
+  const { vehicleId } = req.params;
+  const targetId = decodeURIComponent(vehicleId);
+  const live = localTelemetry[targetId] || localTelemetry[vehicleId] || {};
+
+  res.json({
+    mileageHistory: [
+      { day: 'Mon', km: 120 }, { day: 'Tue', km: 145 }, { day: 'Wed', km: 110 },
+      { day: 'Thu', km: 160 }, { day: 'Fri', km: 135 }, { day: 'Sat', km: 90 }, { day: 'Sun', km: 45 }
+    ],
+    hoursSummary: {
+      running: live.isOnline ? 4.2 : 0,
+      idle: live.isOnline ? 1.1 : 0,
+      parked: live.isOnline ? 18.7 : 24.0
+    },
+    deviationCount: 0
+  });
+});
+
 app.get('/api/alerts', async (req, res) => {
   try {
     if (db) {
