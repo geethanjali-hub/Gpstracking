@@ -488,26 +488,9 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
-let localTelemetry = {
-  'gps-obd-tracker-01': {
-    lat: null,
-    lng: null,
-    fix: false,
-    gpsValid: false,
-    isOnline: false,
-    status: 'offline',
-    speed: 0,
-    heading: 0,
-    satellites: 0,
-    altitude: 0,
-    hdop: 0,
-    rpm: 0,
-    coolantTemp: 0,
-    fuelLevel: 0,
-    backupBatteryPercent: 0
-  }
-};
-
+// PURE DYNAMIC: Start completely empty — only fill from real live MQTT packets
+// Never pre-seed with static data — device status must come exclusively from hardware
+let localTelemetry = {};
 let localTelemetryByTopic = {};
 const addressCache = new Map();
 

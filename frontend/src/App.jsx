@@ -39,10 +39,11 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
 
-  const isOff = telemetryData.isOnline === false || telemetryData.status === 'offline';
+  const isOff = !telemetryData || telemetryData.isOnline === false || telemetryData.status === 'offline' || telemetryData.isOnline !== true;
   const hasCoords = typeof telemetryData.lat === 'number' && typeof telemetryData.lng === 'number' && !isNaN(telemetryData.lat) && telemetryData.lat !== 0;
-  const lat = hasCoords ? telemetryData.lat : 11.02366;
-  const lng = hasCoords ? telemetryData.lng : 76.9424;
+  // NEVER show fake static coords for offline devices — only show real MQTT coordinates
+  const lat = hasCoords ? telemetryData.lat : null;
+  const lng = hasCoords ? telemetryData.lng : null;
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -57,7 +58,7 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
       attributionControl: false,
       dragging: !L.Browser.mobile,
       tap: false
-    }).setView([lat, lng], hasCoords ? 15 : 12);
+    }).setView([(lat || 11.02366), (lng || 76.9424)], hasCoords ? 15 : 12);
 
     mapInstanceRef.current = map;
 
@@ -2140,8 +2141,8 @@ export default function App() {
                           filteredVehicles.map((v) => {
                             const t = telemetry[v.id] || {};
                             const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
-                            const toAddr = t.fix && t.isOnline !== false ? (currentAddress[v.id] || 'Transmitting Data') : 'Location Unavailable';
-                            const isLive = t.isOnline !== false && (t.fix || t.lat);
+                            const toAddr = t.fix && t.isOnline === true ? (currentAddress[v.id] || 'Transmitting Data') : 'Location Unavailable';
+                            const isLive = t.isOnline === true && (t.fix || t.lat);
 
                             return (
                               <tr
@@ -2227,7 +2228,7 @@ export default function App() {
                   <div className="admin-fleet-grid">
                     {filteredVehicles.map(v => {
                       const tData = telemetry[v.id] || {};
-                      const isOff = tData.isOnline === false || tData.status === 'offline';
+                      const isOff = !telemetry[v.id] || tData.isOnline !== true;
                       return (
                         <div key={v.id} className="fleet-card">
                           <div className="fleet-card-header">
@@ -2418,8 +2419,8 @@ export default function App() {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <span className="badge-online">🟢 {vehicles.filter(v => telemetry[v.id]?.isOnline !== false).length} Online</span>
-                  <span className="badge-offline">🔴 {vehicles.filter(v => telemetry[v.id]?.isOnline === false || telemetry[v.id]?.status === 'offline').length} Offline</span>
+                  <span className="badge-online">🟢 {vehicles.filter(v => telemetry[v.id]?.isOnline === true).length} Online</span>
+                  <span className="badge-offline">🔴 {vehicles.filter(v => !telemetry[v.id] || telemetry[v.id]?.isOnline !== true).length} Offline</span>
                 </div>
               </div>
 
