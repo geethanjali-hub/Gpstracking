@@ -716,6 +716,12 @@ app.post('/api/vehicles', async (req, res) => {
     const newVehicle = req.body;
     const vId = newVehicle.id || `gps-tracker-0${localVehicles.length + 1}`;
     
+    // Extract up to 5 Emergency Phone Numbers for GSM SMS Alerts
+    const rawPhones = Array.isArray(newVehicle.phoneNumbers)
+      ? newVehicle.phoneNumbers
+      : (typeof newVehicle.phoneNumbers === 'string' ? newVehicle.phoneNumbers.split(',').map(p => p.trim()) : []);
+    const phoneNumbers = rawPhones.map(p => p.trim()).filter(p => p.length > 0).slice(0, 5);
+
     // Check if vehicle already exists
     const existingIndex = localVehicles.findIndex(v => v.id === vId);
     const vehicleData = {
@@ -726,6 +732,7 @@ app.post('/api/vehicles', async (req, res) => {
       status: newVehicle.status || 'offline',
       topic: newVehicle.topic || `sedhupathi/${vId}/data`,
       broker: newVehicle.broker || 'mqtt://test.mosquitto.org:1883',
+      phoneNumbers,
       routeEnabled: true,
       geofenceEnabled: true,
       deviationThreshold: 300,
@@ -748,7 +755,7 @@ app.post('/api/vehicles', async (req, res) => {
       if (db) {
         await setDoc(doc(db, 'vehicles', vId), vehicleData);
       }
-      console.log(`✅ Saved vehicle ${vId} directly to Firebase Firestore ('vehicles')`);
+      console.log(`✅ Saved vehicle ${vId} with ${phoneNumbers.length} emergency phone numbers directly to Firebase Firestore ('vehicles')`);
     } catch (fbErr) {
       console.warn("⚠️ Firebase Firestore write warning:", fbErr.message);
     }
@@ -783,6 +790,18 @@ app.post('/api/vehicles', async (req, res) => {
           console.warn(`📡 MQTT: Failed to subscribe to ${vehicleData.topic}:`, err.message);
         }
       });
+
+      // 📱 Publish MQTT Configuration Payload with 5 Phone Numbers to ESP32 Hardware Tracker
+      const configTopic = `sedhupathi/${vId}/config`;
+      const configPayload = JSON.stringify({
+        cmd: "SET_SMS_NUMBERS",
+        vehicleId: vId,
+        count: phoneNumbers.length,
+        phone_numbers: phoneNumbers,
+        timestamp: new Date().toISOString()
+      });
+      mqttClient.publish(configTopic, configPayload, { qos: 1, retain: true });
+      console.log(`📡 MQTT: Broadcasted SMS emergency numbers (${phoneNumbers.length}) to ESP32 config topic [${configTopic}]`);
     }
 
     broadcast({ type: 'VEHICLE_ADDED', data: vehicleData });
@@ -1095,6 +1114,23 @@ function checkStationaryAlert(vehicleId, lat, lng, speed, address) {
 
       // Broadcast instant alert notification to all connected WebSockets (Admin, Operators, Drivers)
       broadcast({ type: 'ALERT_TRIGGERED', alert: alertDoc });
+
+      // 📱 Dispatch SMS Command over MQTT to ESP32 GSM Module
+      const vehicle = localVehicles.find(v => v.id === vehicleId);
+      const targetPhones = vehicle?.phoneNumbers || [];
+      if (mqttClient && mqttClient.connected && targetPhones.length > 0) {
+        const cmdTopic = `sedhupathi/${vehicleId}/config`;
+        const smsAlertPayload = JSON.stringify({
+          cmd: "SEND_SMS_ALERT",
+          vehicleId,
+          alertType: "STATIONARY_1HR",
+          message: alertDoc.message,
+          phone_numbers: targetPhones,
+          timestamp: new Date().toISOString()
+        });
+        mqttClient.publish(cmdTopic, smsAlertPayload, { qos: 1 });
+        console.log(`📱 MQTT: Dispatched SMS alert to ESP32 GSM Module on topic [${cmdTopic}] for ${targetPhones.length} numbers`);
+      }
     }
   } else {
     vehicleStationaryTracker.set(vehicleId, {

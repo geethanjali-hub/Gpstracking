@@ -192,6 +192,13 @@ export default function App() {
   const [newDeviceTopic, setNewDeviceTopic] = useState('');
   const [newDeviceBroker, setNewDeviceBroker] = useState('mqtt://test.mosquitto.org:1883');
 
+  // Emergency SMS Phone Numbers State (Max 5 Numbers for ESP32 GSM Module)
+  const [smsPhone1, setSmsPhone1] = useState('');
+  const [smsPhone2, setSmsPhone2] = useState('');
+  const [smsPhone3, setSmsPhone3] = useState('');
+  const [smsPhone4, setSmsPhone4] = useState('');
+  const [smsPhone5, setSmsPhone5] = useState('');
+
   // Editable Alert Threshold State
   const [alertMaxSpeed, setAlertMaxSpeed] = useState('120');
   const [alertMaxTemp, setAlertMaxTemp] = useState('105');
@@ -500,6 +507,10 @@ export default function App() {
     const brokerClean = newDeviceBroker.trim() || `mqtt://test.mosquitto.org:1883`;
     const deviceNameClean = newVehicleName.trim() || `${userClean}'s Device (${deviceIdClean})`;
 
+    const phoneNumbers = [smsPhone1, smsPhone2, smsPhone3, smsPhone4, smsPhone5]
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
     try {
       // 1. Post to backend API to register new vehicle / device & persist to DB
       const res = await fetch('/api/vehicles', {
@@ -511,6 +522,7 @@ export default function App() {
           userName: userClean,
           topic: topicClean,
           broker: brokerClean,
+          phoneNumbers,
           vin: `OBD_TRK_${Math.floor(1000 + Math.random() * 9000)}`
         })
       });
@@ -535,12 +547,17 @@ export default function App() {
         setNewDeviceId('');
         setNewDeviceTopic('');
         setNewVehicleName('');
+        setSmsPhone1('');
+        setSmsPhone2('');
+        setSmsPhone3('');
+        setSmsPhone4('');
+        setSmsPhone5('');
 
         // 4. Refresh vehicle list from DB and select the new device
         await fetchVehicles();
         setSelectedVehicleId(deviceIdClean);
 
-        alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
+        alert(`💾 Registered Device "${deviceIdClean}" with ${phoneNumbers.length} Emergency SMS contacts on Topic "${topicClean}"!`);
       } else {
         alert("Failed to register device on server database.");
       }
@@ -2580,8 +2597,24 @@ export default function App() {
                         <label>MQTT Broker Host / Name</label>
                         <input type="text" className="form-input" placeholder="e.g. mqtt://test.mosquitto.org:1883" value={newDeviceBroker} onChange={e => setNewDeviceBroker(e.target.value)} required />
                       </div>
-                      <button type="submit" className="action-btn" style={{ marginTop: '0.4rem', backgroundColor: 'var(--accent-cyan)' }}>
-                        💾 Save
+
+                      {/* 📱 Emergency SMS Alert Contacts (Up to 5 Phone Numbers for ESP32 + GSM Module) */}
+                      <div className="form-group" style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem' }}>
+                        <label style={{ color: 'var(--accent-orange)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          📱 Emergency SMS Alert Contacts (Max 5 Numbers)
+                        </label>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
+                          Phone numbers synced to ESP32 GSM module via MQTT for cellular SMS alerts.
+                        </span>
+                        <input type="tel" className="form-input" placeholder="Phone 1 (e.g. +919876543210)" value={smsPhone1} onChange={e => setSmsPhone1(e.target.value)} style={{ marginBottom: '0.35rem' }} />
+                        <input type="tel" className="form-input" placeholder="Phone 2 (e.g. +919876543211)" value={smsPhone2} onChange={e => setSmsPhone2(e.target.value)} style={{ marginBottom: '0.35rem' }} />
+                        <input type="tel" className="form-input" placeholder="Phone 3 (e.g. +919876543212)" value={smsPhone3} onChange={e => setSmsPhone3(e.target.value)} style={{ marginBottom: '0.35rem' }} />
+                        <input type="tel" className="form-input" placeholder="Phone 4 (e.g. +919876543213)" value={smsPhone4} onChange={e => setSmsPhone4(e.target.value)} style={{ marginBottom: '0.35rem' }} />
+                        <input type="tel" className="form-input" placeholder="Phone 5 (e.g. +919876543214)" value={smsPhone5} onChange={e => setSmsPhone5(e.target.value)} />
+                      </div>
+
+                      <button type="submit" className="action-btn" style={{ marginTop: '0.6rem', backgroundColor: 'var(--accent-cyan)' }}>
+                        💾 Save Device & Sync SMS Contacts
                       </button>
                     </form>
                   </div>
@@ -2592,7 +2625,7 @@ export default function App() {
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                       All registered devices below are stored in the database. Click <b>Delete</b> to remove them.
                     </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '380px', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '520px', overflowY: 'auto' }}>
                       {vehicles.length === 0 ? (
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center' }}>
                           No registered devices in database. Fill out the form to save a device.
@@ -2600,6 +2633,7 @@ export default function App() {
                       ) : (
                         vehicles.map(v => {
                           const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
+                          const phones = v.phoneNumbers || [];
                           return (
                             <div
                               key={v.id}
@@ -2626,6 +2660,11 @@ export default function App() {
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                   🌐 Broker: <code style={{ color: '#a7f3d0' }}>{v.broker || 'mqtt://test.mosquitto.org:1883'}</code>
                                 </div>
+                                {phones.length > 0 && (
+                                  <div style={{ fontSize: '0.68rem', color: 'var(--accent-orange)', fontWeight: 600 }}>
+                                    📱 SMS Emergency Contacts ({phones.length}): {phones.join(', ')}
+                                  </div>
+                                )}
                                 {(v.userName || mappedUser?.name) && (
                                   <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 600 }}>
                                     👤 User: {v.userName || mappedUser?.name}
