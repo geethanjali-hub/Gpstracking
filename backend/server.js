@@ -122,6 +122,11 @@ const openApiSpec = {
   }
 };
 
+// Serve OpenAPI Specification JSON
+app.get('/api-spec.json', (req, res) => {
+  res.json(openApiSpec);
+});
+
 // Pure Backend Root Status API Endpoint
 app.get('/', (req, res) => {
   res.json({
