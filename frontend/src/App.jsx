@@ -1187,7 +1187,7 @@ export default function App() {
           <div className="brand-icon">
             <Shield size={16} />
           </div>
-          <span className="brand-name">IBOTS FLEET</span>
+          <span className="brand-name">ARMSTRONG GPS</span>
         </div>
 
         <nav>
@@ -1202,6 +1202,11 @@ export default function App() {
             <li>
               <span className={`nav-link ${activeTab === 'tracking' ? 'active' : ''}`} onClick={() => setActiveTab('tracking')}>
                 <Map size={14} /> {role === 'viewer' ? 'My Live Tracking' : 'Live Tracking'}
+              </span>
+            </li>
+            <li>
+              <span className={`nav-link ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => setActiveTab('gallery')}>
+                <LayoutGrid size={14} style={{ color: 'var(--accent-cyan)' }} /> Fleet Gallery Grid
               </span>
             </li>
             <li>
@@ -1265,6 +1270,7 @@ export default function App() {
                 </span>
               </span>
             )}
+            {activeTab === 'gallery' && 'Fleet Gallery Grid Overview'}
             {activeTab === 'engine' && 'Engine Health'}
             {activeTab === 'fuel' && 'Fuel Monitoring'}
             {activeTab === 'battery' && 'Backup Battery Status'}
@@ -1909,6 +1915,85 @@ export default function App() {
               </div>
             </div>
           </div>
+          )}
+
+          {/* FLEET GALLERY GRID PAGE */}
+          {activeTab === 'gallery' && (
+            <div className="panel-container">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <LayoutGrid size={20} style={{ color: 'var(--accent-cyan)' }} /> Armstrong GPS Fleet Gallery Overview
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Real-time gallery monitoring across all registered hardware tracking devices in your fleet.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span className="badge-online">🟢 {vehicles.filter(v => telemetry[v.id]?.isOnline !== false).length} Online</span>
+                  <span className="badge-offline">🔴 {vehicles.filter(v => telemetry[v.id]?.isOnline === false || telemetry[v.id]?.status === 'offline').length} Offline</span>
+                </div>
+              </div>
+
+              <div className="admin-fleet-grid">
+                {vehicles.map(v => {
+                  const tData = telemetry[v.id] || {};
+                  const isOff = tData.isOnline === false || tData.status === 'offline';
+                  return (
+                    <div key={v.id} className="fleet-card" style={{ borderTop: `4px solid ${isOff ? '#ef4444' : '#0284c7'}` }}>
+                      <div className="fleet-card-header">
+                        <span className="fleet-card-title" style={{ fontSize: '1.1rem' }}>
+                          📡 {v.name}
+                        </span>
+                        <span className={isOff ? 'badge-offline' : 'badge-online'}>
+                          {isOff ? '🔴 OFFLINE' : '🟢 LIVE GPS'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.75rem 0', background: 'rgba(255,255,255,0.02)', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Device Speed</span>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: isOff ? 'var(--text-muted)' : 'var(--accent-cyan)' }}>
+                            {isOff ? '0 km/h' : `${tData.speed || 0} km/h`}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Backup Battery</span>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#10b981' }}>
+                            {tData.backupBatteryPercent || 100}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)' }}>
+                        <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
+                        <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
+                        <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
+                        <div><strong>Coordinates:</strong> {!isOff && tData.lat ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Location Offline'}</div>
+                        <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
+                      </div>
+
+                      <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => { setSelectedVehicleId(v.id); setActiveTab('tracking'); }}
+                          className="action-btn"
+                          style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                        >
+                          <Eye size={12} /> Focus on Map
+                        </button>
+                        <button
+                          onClick={() => { setSelectedVehicleId(v.id); setActiveTab('history'); fetchRouteHistory(v.id); }}
+                          className="action-btn secondary"
+                          style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                        >
+                          <Clock size={12} /> View History
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* ENGINE TAB */}

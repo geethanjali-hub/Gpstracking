@@ -35,7 +35,7 @@ const wss = new WebSocketServer({ server });
 const openApiSpec = {
   openapi: "3.0.0",
   info: {
-    title: "IBOTS GPS Vehicle Tracking Telematics API",
+    title: "Armstrong GPS Telematics Backend API",
     version: "1.0.0",
     description: "Interactive Swagger UI documentation and live testing console for ESP32 hardware MQTT payloads, vehicle management, and telematics telemetry."
   },
@@ -175,7 +175,7 @@ app.get('/api-spec.json', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     status: 'online',
-    service: 'IBOTS GPS Telematics Backend API',
+    service: 'Armstrong GPS Telematics Backend API',
     database: 'Firebase Cloud Database (ibots-gps)',
     docs: '/docs',
     endpoints: {
@@ -193,7 +193,7 @@ app.get(['/docs', '/api-docs', '/swagger'], (req, res) => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>IBOTS GPS Backend API — Swagger UI Console</title>
+      <title>Armstrong GPS Backend API — Swagger UI Console</title>
       <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.min.css" />
       <style>
         html { box-sizing: border-box; }
@@ -208,7 +208,7 @@ app.get(['/docs', '/api-docs', '/swagger'], (req, res) => {
     </head>
     <body>
       <div class="topbar-header">
-        <h1>⚡ IBOTS GPS Telematics Backend — Interactive API Console</h1>
+        <h1>⚡ Armstrong GPS Telematics Backend — Interactive API Console</h1>
         <a href="https://gpstracking-zeta.vercel.app/" class="btn-ui" target="_blank">Launch Web Dashboard ➔</a>
       </div>
       <div id="swagger-ui"></div>
