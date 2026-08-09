@@ -1523,7 +1523,7 @@ export default function App() {
                 <Shield size={18} />
               </div>
             </div>
-            <h1 className="auth-title">IBOTS SECURE</h1>
+            <h1 className="auth-title">ARMSTRONG TELEMATICS</h1>
             <p className="auth-subtitle">Industrial GPS Vehicle Tracking Platform</p>
           </div>
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -2716,6 +2716,75 @@ export default function App() {
                   🔄 Refresh Trail
                 </button>
               </div>
+
+              {/* 1-HOUR DEVICE OFF / STATIONARY HIGHLIGHT BANNER */}
+              {(currentData.isOnline === false || currentData.status === 'offline' || (currentData.speed === 0)) && (
+                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '2px solid #ef4444', borderRadius: '8px', padding: '0.85rem 1.15rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ backgroundColor: '#ef4444', color: '#fff', padding: '0.4rem', borderRadius: '50%', display: 'flex' }}>
+                      <AlertOctagon size={22} />
+                    </div>
+                    <div>
+                      <h4 style={{ color: '#ef4444', fontSize: '0.9rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        🛑 1-HOUR DEVICE OFF / STATIONARY ALERT: {selectedVehicle?.name || selectedVehicleId}
+                      </h4>
+                      <p style={{ fontSize: '0.75rem', color: '#cbd5e1', margin: '0.2rem 0 0 0' }}>
+                        Vehicle is currently <b>POWERED OFF / STATIONARY</b>. Last active heartbeat recorded: <strong style={{ color: '#06b6d4' }}>{currentData.lastSeen ? new Date(currentData.lastSeen).toLocaleTimeString() : 'Offline'}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.25)', padding: '0.35rem 0.75rem', borderRadius: '20px', border: '1px solid #ef4444' }}>
+                    ⚠️ OFF FOR &gt; 60 MINS
+                  </span>
+                </div>
+              )}
+
+              {/* TELEMATICS ON/OFF DURATION & DISTANCE HISTORY OVERVIEW */}
+              {historyTrail.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
+                  <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>🟢 Total ON / Driving Time</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981', display: 'block', marginTop: '0.2rem' }}>
+                      {Math.floor(historyTrail.filter(p => (p.speed || 0) > 3).length * 0.5 / 60)}h {Math.round(historyTrail.filter(p => (p.speed || 0) > 3).length * 0.5 % 60)}m
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Device online &amp; moving</span>
+                  </div>
+
+                  <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>🔴 Total OFF / Parked Time</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444', display: 'block', marginTop: '0.2rem' }}>
+                      {Math.floor(historyTrail.filter(p => (p.speed || 0) <= 3).length * 0.5 / 60)}h {Math.round(historyTrail.filter(p => (p.speed || 0) <= 3).length * 0.5 % 60)}m
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Stationary / Power off</span>
+                  </div>
+
+                  <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(6, 182, 212, 0.08)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>🛣️ Total Travel Distance</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#06b6d4', display: 'block', marginTop: '0.2rem' }}>
+                      {(historyTrail.reduce((acc, pt, i) => {
+                        if (i === 0) return 0;
+                        const prev = historyTrail[i - 1];
+                        if (!prev.lat || !pt.lat) return acc;
+                        const R = 6371;
+                        const dLat = (pt.lat - prev.lat) * Math.PI / 180;
+                        const dLng = (pt.lng - prev.lng) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(prev.lat * Math.PI / 180) * Math.cos(pt.lat * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        return acc + (R * c);
+                      }, 0)).toFixed(1)} km
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Accumulated GPS trail</span>
+                  </div>
+
+                  <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>📍 Recorded GPS Points</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#8b5cf6', display: 'block', marginTop: '0.2rem' }}>
+                      {historyTrail.length} Coordinates
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Firestore telemetry history</span>
+                  </div>
+                </div>
+              )}
 
               {historyLoading ? (
                 <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
