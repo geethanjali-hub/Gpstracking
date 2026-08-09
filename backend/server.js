@@ -40,8 +40,7 @@ const openApiSpec = {
     description: "Interactive Swagger UI documentation and live testing console for ESP32 hardware MQTT payloads, vehicle management, and telematics telemetry."
   },
   servers: [
-    { url: "http://64.227.179.37:3001", description: "DigitalOcean Live Backend Server" },
-    { url: "http://localhost:3001", description: "Local Development Server" }
+    { url: "/", description: "Current Active Live Server" }
   ],
   paths: {
     "/api/vehicles": {
