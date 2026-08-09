@@ -128,8 +128,8 @@ app.get('/api-spec.json', (req, res) => {
   res.json(openApiSpec);
 });
 
-// Swagger UI Dashboard Endpoint (Light Theme)
-app.get(['/', '/docs', '/api-docs', '/swagger'], (req, res) => {
+// Swagger UI Dashboard Endpoint (Light Theme - available at /docs, /api-docs, /swagger)
+app.get(['/docs', '/api-docs', '/swagger'], (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
