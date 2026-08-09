@@ -123,6 +123,129 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
   );
 }
 
+function NavRouteMap({ navData, vehicleData }) {
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+    if (container._leaflet_id) delete container._leaflet_id;
+
+    const originCoords = navData?.origin || [vehicleData?.lat || 11.02366, vehicleData?.lng || 76.9424];
+    const map = L.map(container, { zoomControl: false }).setView(originCoords, 13);
+    mapInstanceRef.current = map;
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    const vehIcon = L.divIcon({
+      html: `<div style="width:36px;height:36px;background:#06b6d4;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;box-shadow:0 0 12px rgba(6,182,212,0.8);">📡</div>`,
+      className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+    });
+    L.marker(originCoords, { icon: vehIcon }).addTo(map).bindPopup(`<b>${vehicleData?.name || 'Vehicle'}</b><br/>Current Live Position`);
+
+    if (navData && navData.destination) {
+      const destIcon = L.divIcon({
+        html: `<div style="width:36px;height:36px;background:#ef4444;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;box-shadow:0 0 12px rgba(239,68,68,0.8);">🏁</div>`,
+        className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+      });
+      L.marker(navData.destination, { icon: destIcon }).addTo(map).bindPopup(`<b>Destination</b><br/>${navData.destName}`);
+
+      if (navData.coordinates && navData.coordinates.length > 0) {
+        const polyline = L.polyline(navData.coordinates, { color: '#0284c7', weight: 5, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+        map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+      }
+    }
+
+    setTimeout(() => {
+      if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+    }, 300);
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [navData, vehicleData?.id]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '520px', borderRadius: '8px', overflow: 'hidden' }}>
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '520px', zIndex: 1 }} />
+    </div>
+  );
+}
+
+function StoppageMap({ stoppages, historyPoints, selectedVehicle }) {
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+    if (container._leaflet_id) delete container._leaflet_id;
+
+    const centerCoords = (stoppages.length > 0 && stoppages[0].lat) 
+      ? [stoppages[0].lat, stoppages[0].lng] 
+      : [11.02366, 76.9424];
+
+    const map = L.map(container, { zoomControl: false }).setView(centerCoords, 13);
+    mapInstanceRef.current = map;
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    if (historyPoints && historyPoints.length > 0) {
+      const lineCoords = historyPoints.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng]);
+      if (lineCoords.length > 0) {
+        const line = L.polyline(lineCoords, { color: '#8b5cf6', weight: 4, opacity: 0.7 }).addTo(map);
+        map.fitBounds(line.getBounds(), { padding: [30, 30] });
+      }
+    }
+
+    stoppages.forEach((stop, idx) => {
+      const stopIcon = L.divIcon({
+        html: `<div style="width:32px;height:32px;background:#ef4444;border:2.5px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:bold;box-shadow:0 0 10px rgba(239,68,68,0.8);">🛑</div>`,
+        className: '', iconSize: [32, 32], iconAnchor: [16, 16]
+      });
+
+      const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon }).addTo(map);
+      marker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 12px; color: #0f172a; padding: 2px;">
+          <strong style="color: #ef4444;">🛑 Stoppage #${idx + 1}</strong><br/>
+          <b>Location:</b> ${stop.address}<br/>
+          <b>Dwell Duration:</b> <span style="color:#ef4444; font-weight:bold;">${stop.durationMins} mins</span><br/>
+          <b>Arrived:</b> ${stop.arrivalTime} | <b>Departed:</b> ${stop.departureTime}
+        </div>
+      `);
+    });
+
+    setTimeout(() => {
+      if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+    }, 300);
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [stoppages, selectedVehicle?.id]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '520px', borderRadius: '8px', overflow: 'hidden' }}>
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '520px', zIndex: 1 }} />
+    </div>
+  );
+}
+
 export default function App() {
   const [token, setToken] = useState(getAccessToken() || null);
   const [role, setRole] = useState(getUserProfile()?.role || localStorage.getItem('role') || 'viewer');
@@ -194,6 +317,136 @@ export default function App() {
       console.warn("Failed to fetch route history:", err);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // Navigation & ETA Tab State
+  const [destAddressInput, setDestAddressInput] = useState('');
+  const [navRouteData, setNavRouteData] = useState(null);
+  const [navLoading, setNavLoading] = useState(false);
+  const [navAddressSuggestions, setNavAddressSuggestions] = useState([]);
+
+  // Stoppage & Dwell Time Analytics State
+  const [stoppageList, setStoppageList] = useState([]);
+  const [stoppagesLoading, setStoppagesLoading] = useState(false);
+
+  // Search Destination Address using Nominatim
+  const handleSearchDestination = async (query) => {
+    if (!query || query.length < 3) return;
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNavAddressSuggestions(data.slice(0, 5));
+      }
+    } catch (err) {
+      console.warn("Geocoding search warning:", err);
+    }
+  };
+
+  // Calculate OSRM Driving Route & ETA
+  const calculateNavRoute = async (destLat, destLng, destName) => {
+    const currentVehData = telemetry[selectedVehicleId] || {};
+    const originLat = currentVehData.lat || 11.02366;
+    const originLng = currentVehData.lng || 76.9424;
+
+    setNavLoading(true);
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson&steps=true`;
+      const res = await fetch(osrmUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const distKm = (route.distance / 1000).toFixed(1);
+          const durationMins = Math.round(route.duration / 60);
+
+          setNavRouteData({
+            origin: [originLat, originLng],
+            destination: [destLat, destLng],
+            destName: destName || destAddressInput,
+            distanceKm: distKm,
+            durationMins,
+            coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]),
+            steps: route.legs[0]?.steps || []
+          });
+        }
+      }
+    } catch (err) {
+      console.error("OSRM Route calculation error:", err);
+    } finally {
+      setNavLoading(false);
+      setNavAddressSuggestions([]);
+    }
+  };
+
+  // Fetch & Analyze Stoppages (> 3 mins dwell time)
+  const fetchStoppageAnalytics = async (vId) => {
+    if (!vId) return;
+    setStoppagesLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/history/${encodeURIComponent(vId)}`);
+      if (res.ok) {
+        const pts = await res.json();
+        const stops = [];
+        let currentStopGroup = [];
+
+        pts.forEach((p) => {
+          const isStationary = (p.speed || 0) <= 3;
+          if (isStationary) {
+            currentStopGroup.push(p);
+          } else {
+            if (currentStopGroup.length >= 2) {
+              const first = currentStopGroup[0];
+              const last = currentStopGroup[currentStopGroup.length - 1];
+              const t1 = new Date(first.timestamp).getTime();
+              const t2 = new Date(last.timestamp).getTime();
+              const durationMins = Math.round((t2 - t1) / 60000);
+
+              if (durationMins >= 3) {
+                stops.push({
+                  id: `stop-${stops.length + 1}`,
+                  lat: first.lat,
+                  lng: first.lng,
+                  address: first.address || first.street || `${first.lat.toFixed(4)}, ${first.lng.toFixed(4)}`,
+                  arrivalTime: new Date(first.timestamp).toLocaleTimeString(),
+                  departureTime: new Date(last.timestamp).toLocaleTimeString(),
+                  durationMins,
+                  pointsCount: currentStopGroup.length
+                });
+              }
+            }
+            currentStopGroup = [];
+          }
+        });
+
+        if (currentStopGroup.length >= 2) {
+          const first = currentStopGroup[0];
+          const last = currentStopGroup[currentStopGroup.length - 1];
+          const t1 = new Date(first.timestamp).getTime();
+          const t2 = new Date(last.timestamp).getTime();
+          const durationMins = Math.round((t2 - t1) / 60000);
+
+          if (durationMins >= 3) {
+            stops.push({
+              id: `stop-${stops.length + 1}`,
+              lat: first.lat,
+              lng: first.lng,
+              address: first.address || first.street || `${first.lat.toFixed(4)}, ${first.lng.toFixed(4)}`,
+              arrivalTime: new Date(first.timestamp).toLocaleTimeString(),
+              departureTime: new Date(last.timestamp).toLocaleTimeString(),
+              durationMins,
+              pointsCount: currentStopGroup.length
+            });
+          }
+        }
+
+        setStoppageList(stops);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch stoppage analytics:", err);
+    } finally {
+      setStoppagesLoading(false);
     }
   };
 
@@ -1358,14 +1611,14 @@ export default function App() {
               {usernameInput === 'admin' ? (
                 <span><strong>Admin Mode:</strong> Full management, add/delete vehicles, configure geofences/routes, user management.</span>
               ) : usernameInput === 'operator' ? (
-                <span><strong>Factory Operator Mode:</strong> Monitor factory departures, assign trip routes, live alerts & report downloads.</span>
+                <span><strong>Factory Operator Mode:</strong> Monitor factory departures, assign trip routes, live alerts &amp; report downloads.</span>
               ) : (
-                <span><strong>Customer / Driver Mode:</strong> Live GPS tracking of assigned vehicle, speed, route progress & ETA.</span>
+                <span><strong>Customer / Driver Mode:</strong> Live GPS tracking of assigned vehicle, speed, route progress &amp; ETA.</span>
               )}
             </div>
 
             <button type="submit" className="action-btn" style={{ width: '100%', marginTop: '0.25rem' }}>
-              Authenticate & Launch Panel
+              Authenticate &amp; Launch Panel
             </button>
           </form>
         </div>
@@ -1416,6 +1669,16 @@ export default function App() {
             <li>
               <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
                 <Clock size={14} style={{ color: '#8b5cf6' }} /> Route History Replay
+              </span>
+            </li>
+            <li>
+              <span className={`nav-link ${activeTab === 'navigation' ? 'active' : ''}`} onClick={() => setActiveTab('navigation')}>
+                <Navigation size={14} style={{ color: '#06b6d4' }} /> Google Maps Nav &amp; ETA
+              </span>
+            </li>
+            <li>
+              <span className={`nav-link ${activeTab === 'stoppages' ? 'active' : ''}`} onClick={() => { setActiveTab('stoppages'); if (selectedVehicleId) fetchStoppageAnalytics(selectedVehicleId); }}>
+                <Compass size={14} style={{ color: '#ef4444' }} /> Stoppage Analytics
               </span>
             </li>
             <li>
@@ -1475,6 +1738,8 @@ export default function App() {
               </span>
             )}
             {activeTab === 'gallery' && 'Fleet Gallery Grid Overview'}
+            {activeTab === 'navigation' && 'Google Maps Navigation & Real-Time ETA'}
+            {activeTab === 'stoppages' && 'Stoppage & Dwell Time Analytics'}
             {activeTab === 'engine' && 'Engine Health'}
             {activeTab === 'fuel' && 'Fuel Monitoring'}
             {activeTab === 'battery' && 'Backup Battery Status'}
@@ -1745,7 +2010,7 @@ export default function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
                   <div>
                     <span className="panel-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <Gauge size={16} style={{ color: 'var(--accent-cyan)' }} /> Fleet Vehicles & Performance Status
+                      <Gauge size={16} style={{ color: 'var(--accent-cyan)' }} /> Fleet Vehicles &amp; Performance Status
                     </span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'block' }}>
                       Showing data for: <strong style={{ color: 'var(--accent-cyan)' }}>
@@ -2092,7 +2357,7 @@ export default function App() {
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address & PIN</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address &amp; PIN</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
                     {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentAddress[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
                   </span>
@@ -2113,11 +2378,10 @@ export default function App() {
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Geofence Zone Boundaries</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{geofences[selectedVehicleId]?.radius}m radius</span>
-                </div>
                 </div>
               </div>
             </div>
+          </div>
           </div>
           )}
 
@@ -2201,6 +2465,167 @@ export default function App() {
             </div>
           )}
 
+          {/* GOOGLE MAPS NAVIGATION AND ETA TAB */}
+          {activeTab === 'navigation' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '1.25rem', height: '540px' }}>
+              <div className="panel-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#06b6d4' }}>
+                  <Navigation size={16} /> Destination Route Search
+                </span>
+
+                <div style={{ position: 'relative' }}>
+                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                    Enter Destination Address
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. Gandhipuram, Coimbatore"
+                      value={destAddressInput}
+                      onChange={(e) => { setDestAddressInput(e.target.value); handleSearchDestination(e.target.value); }}
+                      style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.9)', color: '#fff', border: '1px solid var(--border-color)', padding: '0.45rem 0.65rem', borderRadius: '6px', fontSize: '0.78rem', outline: 'none' }}
+                    />
+                  </div>
+
+                  {navAddressSuggestions.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, backgroundColor: '#0f172a', border: '1px solid #06b6d4', borderRadius: '6px', marginTop: '4px', maxHeight: '180px', overflowY: 'auto', boxShadow: '0 8px 16px rgba(0,0,0,0.5)' }}>
+                      {navAddressSuggestions.map((item, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setDestAddressInput(String(item.display_name));
+                            calculateNavRoute(parseFloat(item.lat), parseFloat(item.lon), String(item.display_name));
+                          }}
+                          style={{ padding: '0.5rem 0.75rem', fontSize: '0.72rem', color: '#cbd5e1', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                        >
+                          📍 {String(item.display_name)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Preset Quick Destinations */}
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>Quick Preset Destinations:</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    {[
+                      { name: 'Coimbatore Airport', lat: 11.0300, lng: 77.0434 },
+                      { name: 'Gandhipuram Bus Stand', lat: 11.0168, lng: 76.9558 },
+                      { name: 'Railway Station', lat: 10.9980, lng: 76.9637 },
+                      { name: 'TIDEL Park', lat: 11.0284, lng: 77.0270 }
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setDestAddressInput(p.name);
+                          calculateNavRoute(p.lat, p.lng, p.name);
+                        }}
+                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid rgba(6,182,212,0.4)', backgroundColor: 'rgba(6,182,212,0.1)', color: '#06b6d4', cursor: 'pointer' }}
+                      >
+                        📍 {String(p.name)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {navRouteData && (
+                  <div style={{ background: 'rgba(6, 182, 212, 0.08)', border: '1px solid #06b6d4', borderRadius: '8px', padding: '0.75rem', marginTop: '0.5rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#06b6d4', marginBottom: '0.3rem' }}>
+                      🏁 Destination Directions &amp; ETA
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div><b>Destination:</b> {String(navRouteData.destName)}</div>
+                      <div><b>Distance:</b> <span style={{ color: '#10b981', fontWeight: 700 }}>{navRouteData.distanceKm} km</span></div>
+                      <div><b>Estimated Time (ETA):</b> <span style={{ color: '#06b6d4', fontWeight: 700 }}>{navRouteData.durationMins} mins</span></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tracker Current Location NOW */}
+                <div style={{ marginTop: 'auto', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.75rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '0.3rem' }}>
+                    📡 Tracker Location NOW
+                  </span>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <div><b>Vehicle:</b> {selectedVehicle?.name || 'GPS Tracker'}</div>
+                    <div><b>Live Coordinates:</b> {currentData.lat ? `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}` : 'Offline'}</div>
+                    <div><b>Status:</b> <span style={{ color: currentData.isOnline === false ? '#ef4444' : '#10b981', fontWeight: 700 }}>{currentData.isOnline === false ? '🔴 Offline' : '🟢 Live GPS'}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px' }}>
+                <NavRouteMap navData={navRouteData} vehicleData={currentData} />
+              </div>
+            </div>
+          )}
+
+          {/* STOPPAGE AND DWELL TIME ANALYTICS TAB */}
+          {activeTab === 'stoppages' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '1.25rem', height: '540px' }}>
+              <div className="panel-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '540px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="panel-title" style={{ color: '#ef4444', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Compass size={16} /> Stoppage &amp; Dwell List
+                  </span>
+                  <button
+                    onClick={() => fetchStoppageAnalytics(selectedVehicleId)}
+                    className="action-btn"
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                  >
+                    🔄 Analyze
+                  </button>
+                </div>
+
+                <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.72rem', color: '#f8fafc' }}>
+                  <b>Total Stops Detected:</b> <span style={{ color: '#ef4444', fontWeight: 800 }}>{stoppageList.length} Stoppages</span> (&gt; 3 mins)
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '4px' }}>
+                  {stoppagesLoading ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      ⏳ Analyzing historical GPS telemetry for stoppage dwell times...
+                    </div>
+                  ) : stoppageList.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      🛑 No extended stoppages (&gt; 3 mins) detected for selected vehicle.
+                    </div>
+                  ) : (
+                    stoppageList.map((stop, idx) => (
+                      <div
+                        key={stop.id}
+                        style={{
+                          padding: '0.65rem',
+                          borderRadius: '6px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          borderLeft: '4px solid #ef4444',
+                          border: '1px solid var(--border-color)',
+                          borderLeftWidth: '4px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                          <strong style={{ color: '#ef4444', fontSize: '0.78rem' }}>🛑 Stop #{idx + 1}</strong>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', background: 'rgba(239, 68, 68, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {stop.durationMins} mins dwell
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <div>📍 <b>Address:</b> {stop.address}</div>
+                          <div>🕒 <b>Arrived:</b> {stop.arrivalTime} | <b>Departed:</b> {stop.departureTime}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px' }}>
+                <StoppageMap stoppages={stoppageList} historyPoints={historyTrail} selectedVehicle={selectedVehicle} />
+              </div>
+            </div>
+          )}
+
           {/* ENGINE TAB */}
           {activeTab === 'engine' && (
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr', gap: '1.25rem', height: '480px' }}>
@@ -2269,70 +2694,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADMIN FLEET GRID VIEW TAB */}
-          {activeTab === 'grid' && (
-            <div className="panel-container">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <LayoutGrid size={18} style={{ color: 'var(--accent-cyan)' }} /> Admin Multi-Vehicle Fleet Grid
-                  </h3>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    Real-time status overview across all active hardware trackers in the fleet database.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <span className="badge-online">🟢 {vehicles.filter(v => telemetry[v.id]?.isOnline !== false).length} Online</span>
-                  <span className="badge-offline">🔴 {vehicles.filter(v => telemetry[v.id]?.isOnline === false || telemetry[v.id]?.status === 'offline').length} Offline</span>
-                </div>
-              </div>
 
-              <div className="admin-fleet-grid">
-                {vehicles.map(v => {
-                  const tData = telemetry[v.id] || {};
-                  const isOff = tData.isOnline === false || tData.status === 'offline';
-                  return (
-                    <div key={v.id} className="fleet-card">
-                      <div className="fleet-card-header">
-                        <span className="fleet-card-title">
-                          📡 {v.name}
-                        </span>
-                        <span className={isOff ? 'badge-offline' : 'badge-online'}>
-                          {isOff ? '🔴 OFFLINE' : '🟢 LIVE GPS'}
-                        </span>
-                      </div>
-
-                      <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', color: 'var(--text-secondary)' }}>
-                        <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
-                        <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
-                        <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
-                        <div><strong>Coordinates:</strong> {!isOff && tData.lat ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Offline'}</div>
-                        <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
-                        <div><strong>Backup Battery:</strong> <span style={{ color: '#10b981', fontWeight: 700 }}>{tData.backupBatteryPercent || 100}%</span></div>
-                      </div>
-
-                      <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => { setSelectedVehicleId(v.id); setActiveTab('tracking'); }}
-                          className="action-btn"
-                          style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                        >
-                          <Eye size={12} /> Focus on Map
-                        </button>
-                        <button
-                          onClick={() => { setSelectedVehicleId(v.id); setActiveTab('history'); fetchRouteHistory(v.id); }}
-                          className="action-btn secondary"
-                          style={{ flex: 1, padding: '0.4rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
-                        >
-                          <Clock size={12} /> View History
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* ROUTE HISTORY REPLAY TAB */}
           {activeTab === 'history' && (
@@ -2340,7 +2702,7 @@ export default function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Clock size={18} style={{ color: '#8b5cf6' }} /> Route History Trail & Playback Replay
+                    <Clock size={18} style={{ color: '#8b5cf6' }} /> Route History Trail &amp; Playback Replay
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                     Replay exact historical travel paths stored in Firebase Firestore <span style={{ fontFamily: 'var(--font-mono)' }}>telemetry_history</span>.
@@ -2412,7 +2774,7 @@ export default function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <AlertTriangle size={18} style={{ color: '#ef4444' }} /> 1-Hour Stationary & Idle Alert Center
+                    <AlertTriangle size={18} style={{ color: '#ef4444' }} /> 1-Hour Stationary &amp; Idle Alert Center
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                     Real-time notifications sent to Admins, Operators, and Drivers when a vehicle remains stationary for &gt;= 60 minutes.
@@ -2722,7 +3084,7 @@ export default function App() {
               <div className="panel-container">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Compass size={18} style={{ color: 'var(--accent-orange)' }} />
-                  <strong>Route Deviation & Geofence Report</strong>
+                  <strong>Route Deviation &amp; Geofence Report</strong>
                   <span style={{ fontSize: '0.6rem', color: 'var(--accent-orange)', fontWeight: 700, border: '1px solid var(--accent-orange)', borderRadius: '3px', padding: '1px 4px' }}>NEW</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.5rem 0' }}>Route deviation events, geofence zone entry/exit logs, and deviation count per day.</p>
@@ -2756,14 +3118,14 @@ export default function App() {
               
               <div>
                 <h3 style={{ fontSize: '1rem', color: 'var(--accent-cyan)', marginBottom: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-                  👥 User & Hardware Device Management
+                  👥 User &amp; Hardware Device Management
                 </h3>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
                   
                   {/* 1. Register & Save Hardware Device */}
                   <div className="panel-container">
-                    <span className="panel-title">Register & Save Device</span>
+                    <span className="panel-title">Register &amp; Save Device</span>
                     <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                       <div className="form-group">
                         <label>Full User Name</label>
@@ -2887,7 +3249,7 @@ export default function App() {
 
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
                         <button type="submit" className="action-btn" style={{ flex: 1, backgroundColor: 'var(--accent-orange)', color: '#000', fontWeight: 800 }}>
-                          💾 Save & Sync SMS Numbers
+                          💾 Save &amp; Sync SMS Numbers
                         </button>
                         <button type="button" onClick={handleTestSms} className="action-btn" style={{ flex: 1, backgroundColor: 'var(--accent-cyan)', color: '#000', fontWeight: 800 }}>
                           📲 Send Test SMS Now
