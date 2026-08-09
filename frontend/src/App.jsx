@@ -225,7 +225,8 @@ export default function App() {
   const [newDeviceTopic, setNewDeviceTopic] = useState('');
   const [newDeviceBroker, setNewDeviceBroker] = useState('mqtt://test.mosquitto.org:1883');
 
-  // Emergency SMS Phone Numbers State (Max 5 Numbers for ESP32 GSM Module)
+  // Dedicated Emergency SMS Phone Numbers Form State (Max 5 Numbers for ESP32 GSM Module)
+  const [smsTargetVehicleId, setSmsTargetVehicleId] = useState('');
   const [smsPhone1, setSmsPhone1] = useState('');
   const [smsPhone2, setSmsPhone2] = useState('');
   const [smsPhone3, setSmsPhone3] = useState('');
@@ -529,6 +530,61 @@ export default function App() {
     }
   };
 
+  // Auto-sync Emergency SMS Phone input fields when selected device changes
+  useEffect(() => {
+    if (vehicles.length > 0 && !smsTargetVehicleId) {
+      setSmsTargetVehicleId(vehicles[0].id);
+    }
+  }, [vehicles]);
+
+  useEffect(() => {
+    if (!smsTargetVehicleId) return;
+    const targetVeh = vehicles.find(v => v.id === smsTargetVehicleId);
+    const phones = targetVeh?.phoneNumbers || [];
+    setSmsPhone1(phones[0] || '');
+    setSmsPhone2(phones[1] || '');
+    setSmsPhone3(phones[2] || '');
+    setSmsPhone4(phones[3] || '');
+    setSmsPhone5(phones[4] || '');
+  }, [smsTargetVehicleId, vehicles]);
+
+  // Save & Sync Emergency Phone Numbers for Selected Device over MQTT
+  const handleSaveSmsContacts = async (e) => {
+    e.preventDefault();
+    if (!smsTargetVehicleId) {
+      alert("Please select a device to configure SMS contacts.");
+      return;
+    }
+
+    const selectedVeh = vehicles.find(v => v.id === smsTargetVehicleId);
+    if (!selectedVeh) return;
+
+    const phoneNumbers = [smsPhone1, smsPhone2, smsPhone3, smsPhone4, smsPhone5]
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    try {
+      const res = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...selectedVeh,
+          phoneNumbers
+        })
+      });
+
+      if (res.ok) {
+        await fetchVehicles();
+        alert(`📲 Updated Emergency SMS Numbers for device "${smsTargetVehicleId}" (${phoneNumbers.length} numbers synced to ESP32 via MQTT)!`);
+      } else {
+        alert("Failed to update emergency contacts on server.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving emergency contacts to database.");
+    }
+  };
+
   // Add New System User & Map Device / MQTT Topic / Broker
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -539,10 +595,6 @@ export default function App() {
     const topicClean = newDeviceTopic.trim() || `sedhupathi/${deviceIdClean}/data`;
     const brokerClean = newDeviceBroker.trim() || `mqtt://test.mosquitto.org:1883`;
     const deviceNameClean = newVehicleName.trim() || `${userClean}'s Device (${deviceIdClean})`;
-
-    const phoneNumbers = [smsPhone1, smsPhone2, smsPhone3, smsPhone4, smsPhone5]
-      .map(p => p.trim())
-      .filter(p => p.length > 0);
 
     try {
       // 1. Post to backend API to register new vehicle / device & persist to DB
@@ -555,7 +607,6 @@ export default function App() {
           userName: userClean,
           topic: topicClean,
           broker: brokerClean,
-          phoneNumbers,
           vin: `OBD_TRK_${Math.floor(1000 + Math.random() * 9000)}`
         })
       });
@@ -580,17 +631,12 @@ export default function App() {
         setNewDeviceId('');
         setNewDeviceTopic('');
         setNewVehicleName('');
-        setSmsPhone1('');
-        setSmsPhone2('');
-        setSmsPhone3('');
-        setSmsPhone4('');
-        setSmsPhone5('');
 
         // 4. Refresh vehicle list from DB and select the new device
         await fetchVehicles();
         setSelectedVehicleId(deviceIdClean);
 
-        alert(`💾 Registered Device "${deviceIdClean}" with ${phoneNumbers.length} Emergency SMS contacts on Topic "${topicClean}"!`);
+        alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
       } else {
         alert("Failed to register device on server database.");
       }
@@ -2617,7 +2663,7 @@ export default function App() {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
                   
-                  {/* 1. Add User & Map Device Topic */}
+                  {/* 1. Register & Save Hardware Device */}
                   <div className="panel-container">
                     <span className="panel-title">Register & Save Device</span>
                     <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
@@ -2642,23 +2688,61 @@ export default function App() {
                         <input type="text" className="form-input" placeholder="e.g. mqtt://test.mosquitto.org:1883" value={newDeviceBroker} onChange={e => setNewDeviceBroker(e.target.value)} required />
                       </div>
 
-                      {/* 📱 Emergency SMS Alert Contacts (Up to 5 Phone Numbers for ESP32 + GSM Module) */}
-                      <div className="form-group" style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem' }}>
-                        <label style={{ color: 'var(--accent-orange)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          📱 Emergency SMS Alert Contacts (Max 5 Numbers)
-                        </label>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                          Phone numbers synced to ESP32 GSM module via MQTT for cellular SMS alerts.
-                        </span>
-                        <input type="tel" className="form-input" placeholder="Phone 1 (e.g. +919876543210)" value={smsPhone1} onChange={e => setSmsPhone1(e.target.value)} style={{ marginBottom: '0.35rem' }} />
-                        <input type="tel" className="form-input" placeholder="Phone 2 (e.g. +919876543211)" value={smsPhone2} onChange={e => setSmsPhone2(e.target.value)} style={{ marginBottom: '0.35rem' }} />
-                        <input type="tel" className="form-input" placeholder="Phone 3 (e.g. +919876543212)" value={smsPhone3} onChange={e => setSmsPhone3(e.target.value)} style={{ marginBottom: '0.35rem' }} />
-                        <input type="tel" className="form-input" placeholder="Phone 4 (e.g. +919876543213)" value={smsPhone4} onChange={e => setSmsPhone4(e.target.value)} style={{ marginBottom: '0.35rem' }} />
-                        <input type="tel" className="form-input" placeholder="Phone 5 (e.g. +919876543214)" value={smsPhone5} onChange={e => setSmsPhone5(e.target.value)} />
+                      <button type="submit" className="action-btn" style={{ marginTop: '0.5rem', backgroundColor: 'var(--accent-cyan)' }}>
+                        💾 Save Device
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* 2. DEDICATED SEPARATE FORM: Emergency SMS Alert Contacts (Max 5 Numbers) */}
+                  <div className="panel-container">
+                    <span className="panel-title" style={{ color: 'var(--accent-orange)' }}>
+                      📱 Emergency SMS Alert Contacts
+                    </span>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                      Configure up to 5 phone numbers synced directly to ESP32 GSM module via MQTT for cellular SMS alerts.
+                    </p>
+
+                    <form onSubmit={handleSaveSmsContacts} style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      <div className="form-group">
+                        <label style={{ color: 'var(--accent-orange)', fontWeight: 700 }}>Select Target Device / Vehicle</label>
+                        <select
+                          className="form-input"
+                          value={smsTargetVehicleId}
+                          onChange={e => setSmsTargetVehicleId(e.target.value)}
+                          style={{ width: '100%', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}
+                        >
+                          {vehicles.map(v => (
+                            <option key={v.id} value={v.id}>
+                              📡 {v.name} ({v.id})
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
-                      <button type="submit" className="action-btn" style={{ marginTop: '0.6rem', backgroundColor: 'var(--accent-cyan)' }}>
-                        💾 Save Device & Sync SMS Contacts
+                      <div className="form-group">
+                        <label style={{ fontSize: '0.72rem' }}>Phone Number 1 (Primary Contact)</label>
+                        <input type="tel" className="form-input" placeholder="e.g. +919876543210" value={smsPhone1} onChange={e => setSmsPhone1(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label style={{ fontSize: '0.72rem' }}>Phone Number 2</label>
+                        <input type="tel" className="form-input" placeholder="e.g. +919876543211" value={smsPhone2} onChange={e => setSmsPhone2(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label style={{ fontSize: '0.72rem' }}>Phone Number 3</label>
+                        <input type="tel" className="form-input" placeholder="e.g. +919876543212" value={smsPhone3} onChange={e => setSmsPhone3(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label style={{ fontSize: '0.72rem' }}>Phone Number 4</label>
+                        <input type="tel" className="form-input" placeholder="e.g. +919876543213" value={smsPhone4} onChange={e => setSmsPhone4(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label style={{ fontSize: '0.72rem' }}>Phone Number 5</label>
+                        <input type="tel" className="form-input" placeholder="e.g. +919876543214" value={smsPhone5} onChange={e => setSmsPhone5(e.target.value)} />
+                      </div>
+
+                      <button type="submit" className="action-btn" style={{ marginTop: '0.4rem', backgroundColor: 'var(--accent-orange)', color: '#000', fontWeight: 800 }}>
+                        📲 Save & Sync SMS Numbers to ESP32
                       </button>
                     </form>
                   </div>
