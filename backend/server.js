@@ -1505,14 +1505,41 @@ app.get(['/api/summaries/:vehicleId', '/api/summaries/*'], async (req, res) => {
 
 app.get('/api/alerts', async (req, res) => {
   try {
+    const alertList = [];
     if (db) {
       const snapshot = await getDocs(collection(db, 'alerts'));
-      const alertList = [];
       snapshot.forEach(docSnap => alertList.push(docSnap.data()));
-      alertList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      return res.json(alertList);
     }
-    res.json([]);
+
+    // Auto-generate 1-Hour Stationary / Idle / Power OFF alerts for ALL registered devices
+    const activeVehicles = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
+    activeVehicles.forEach(v => {
+      const live = localTelemetry[v.id] || {};
+      const isOff = live.isOnline === false || live.status === 'offline';
+      const isStationary = (live.speed || 0) <= 3;
+      const lastSeenMs = live.lastSeen ? (Date.now() - new Date(live.lastSeen).getTime()) : 3600000;
+
+      // If device is offline, stationary, or hasn't moved for > 1 hour
+      if (isOff || isStationary || lastSeenMs >= 3600000) {
+        const hrs = Math.max(1, Math.floor(lastSeenMs / 3600000));
+        const mins = Math.floor((lastSeenMs % 3600000) / 60000);
+        const durationStr = `${hrs}h ${mins}m`;
+
+        alertList.unshift({
+          id: `stat-alert-${v.id}`,
+          vehicleId: v.id,
+          vehicleName: v.name,
+          type: '1-Hour Stationary Alert',
+          severity: 'critical',
+          message: `🛑 Hardware device ${v.name} (${v.id}) has been stationary in the SAME PLACE / OFF for > 1 Hour (${durationStr})!`,
+          timestamp: live.lastSeen || new Date().toISOString(),
+          address: live.address || 'Saibaba Colony, Coimbatore'
+        });
+      }
+    });
+
+    alertList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return res.json(alertList);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

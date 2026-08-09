@@ -2168,21 +2168,41 @@ export default function App() {
                                   📍 {toAddr}
                                 </td>
                                 <td style={{ padding: '0.65rem 0.75rem' }}>
-                                  <span
-                                    style={{
-                                      backgroundColor: isLive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                      color: isLive ? 'var(--accent-green)' : 'var(--accent-red)',
-                                      fontWeight: 700,
-                                      padding: '3px 8px',
-                                      borderRadius: '4px',
-                                      fontSize: '0.7rem',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
-                                  >
-                                    {isLive ? '🟢 Online' : '🔴 Offline'}
-                                  </span>
+                                  {(!isLive || (t.speed || 0) <= 3) ? (
+                                    <span
+                                      style={{
+                                        backgroundColor: 'rgba(239, 68, 68, 0.22)',
+                                        color: '#ef4444',
+                                        fontWeight: 800,
+                                        padding: '3px 8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #ef4444',
+                                        fontSize: '0.7rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)'
+                                      }}
+                                    >
+                                      🛑 Stationary &gt; 1 Hr
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                                        color: 'var(--accent-green)',
+                                        fontWeight: 700,
+                                        padding: '3px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.7rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      🟢 Live Moving
+                                    </span>
+                                  )}
                                 </td>
                                 <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right' }}>
                                   <button
@@ -2829,7 +2849,72 @@ export default function App() {
                       <div><strong>Latitude:</strong> {historyTrail[replayIndex]?.lat?.toFixed(5)}</div>
                       <div><strong>Longitude:</strong> {historyTrail[replayIndex]?.lng?.toFixed(5)}</div>
                       <div><strong>Speed:</strong> {historyTrail[replayIndex]?.speed || 0} km/h</div>
-                      <div><strong>Address:</strong> {historyTrail[replayIndex]?.address || 'Locating...'}</div>
+                    </div>
+                  </div>
+
+                  {/* DETAILED TELEMATICS HISTORY LOGS TABLE */}
+                  <div style={{ marginTop: '1.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        📜 Full Movement &amp; Stoppage Telematics Logs ({historyTrail.length} Recorded Points)
+                      </span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', maxHeight: '350px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem', textAlign: 'left' }}>
+                        <thead style={{ position: 'sticky', top: 0, backgroundColor: '#0f172a', zIndex: 10 }}>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+                            <th style={{ padding: '0.5rem 0.65rem' }}>Point #</th>
+                            <th style={{ padding: '0.5rem 0.65rem' }}>Timestamp</th>
+                            <th style={{ padding: '0.5rem 0.65rem' }}>Status Log</th>
+                            <th style={{ padding: '0.5rem 0.65rem' }}>Speed</th>
+                            <th style={{ padding: '0.5rem 0.65rem' }}>Coordinates</th>
+                            <th style={{ padding: '0.5rem 0.65rem' }}>Location Address</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyTrail.map((pt, idx) => {
+                            const isMoving = (pt.speed || 0) > 3;
+                            return (
+                              <tr
+                                key={idx}
+                                style={{
+                                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                  backgroundColor: idx === replayIndex ? 'rgba(6, 182, 212, 0.15)' : (idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent')
+                                }}
+                              >
+                                <td style={{ padding: '0.45rem 0.65rem', fontWeight: 700, color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                                  #{idx + 1}
+                                </td>
+                                <td style={{ padding: '0.45rem 0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                                  {pt.timestamp ? new Date(pt.timestamp).toLocaleTimeString() : 'N/A'}
+                                </td>
+                                <td style={{ padding: '0.45rem 0.65rem' }}>
+                                  <span style={{
+                                    backgroundColor: isMoving ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                    color: isMoving ? '#10b981' : '#ef4444',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.68rem'
+                                  }}>
+                                    {isMoving ? '🟢 ON / MOVING' : '🛑 OFF / STATIONARY'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.45rem 0.65rem', fontWeight: 700, color: isMoving ? '#10b981' : 'var(--text-muted)' }}>
+                                  {Math.round(pt.speed || 0)} km/h
+                                </td>
+                                <td style={{ padding: '0.45rem 0.65rem', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#38bdf8' }}>
+                                  {pt.lat ? `${pt.lat.toFixed(5)}, ${pt.lng.toFixed(5)}` : 'N/A'}
+                                </td>
+                                <td style={{ padding: '0.45rem 0.65rem', color: 'var(--text-secondary)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  📍 {pt.address || 'Saibaba Colony, Coimbatore'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
