@@ -1210,6 +1210,8 @@ mqttClient.on('message', async (topic, message) => {
         lng,
         heading: telemetryDoc.heading,
         speed: telemetryDoc.speed,
+        status: 'ON',
+        deviceStatus: (telemetryDoc.speed > 3) ? 'ON / MOVING' : 'ON / PARKED (0 km/h)',
         address: addressDetails.address || '',
         timestamp: telemetryDoc.timestamp
       };
@@ -1595,6 +1597,21 @@ setInterval(() => {
         if (topic) localTelemetryByTopic[topic] = offlineDoc;
         localTelemetry[vId] = offlineDoc;
         broadcast({ type: 'TELEMETRY_UPDATE', vehicleId: vId, data: offlineDoc });
+
+        // Log explicit OFF event to telemetry_history in Firestore
+        if (db) {
+          addDoc(collection(db, 'telemetry_history'), {
+            vehicleId: vId,
+            topic: topic || `sedhupathi/${vId}/data`,
+            lat: existingDoc?.lat || 11.0237,
+            lng: existingDoc?.lng || 76.9423,
+            speed: 0,
+            status: 'OFF',
+            deviceStatus: 'POWERED OFF / DISCONNECTED',
+            address: existingDoc?.address || 'Offline',
+            timestamp: new Date().toISOString()
+          }).catch(() => {});
+        }
       }
     }
   });

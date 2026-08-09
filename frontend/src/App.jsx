@@ -2874,7 +2874,9 @@ export default function App() {
                         </thead>
                         <tbody>
                           {historyTrail.map((pt, idx) => {
+                            const isOff = pt.status === 'OFF' || pt.deviceStatus?.includes('OFF');
                             const isMoving = (pt.speed || 0) > 3;
+                            const badgeText = pt.deviceStatus || (isOff ? '🔴 POWERED OFF / DISCONNECTED' : (isMoving ? '🟢 DEVICE ON / MOVING' : '⚡ DEVICE ON / PARKED (0 km/h)'));
                             return (
                               <tr
                                 key={idx}
@@ -2891,14 +2893,14 @@ export default function App() {
                                 </td>
                                 <td style={{ padding: '0.45rem 0.65rem' }}>
                                   <span style={{
-                                    backgroundColor: isMoving ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                    color: isMoving ? '#10b981' : '#f59e0b',
+                                    backgroundColor: isOff ? 'rgba(239, 68, 68, 0.2)' : (isMoving ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)'),
+                                    color: isOff ? '#ef4444' : (isMoving ? '#10b981' : '#f59e0b'),
                                     fontWeight: 700,
                                     padding: '2px 6px',
                                     borderRadius: '4px',
                                     fontSize: '0.68rem'
                                   }}>
-                                    {isMoving ? '🟢 DEVICE ON / MOVING' : '⚡ DEVICE ON / PARKED (0 km/h)'}
+                                    {badgeText}
                                   </span>
                                 </td>
                                 <td style={{ padding: '0.45rem 0.65rem', fontWeight: 700, color: isMoving ? '#10b981' : 'var(--text-muted)' }}>
