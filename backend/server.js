@@ -716,11 +716,12 @@ app.post('/api/vehicles', async (req, res) => {
     const newVehicle = req.body;
     const vId = newVehicle.id || `gps-tracker-0${localVehicles.length + 1}`;
     
-    // Extract up to 5 Emergency Phone Numbers for GSM SMS Alerts
+    // Extract up to 5 Emergency Phone Numbers & SMS Alert Master Status ("ON" / "OFF")
     const rawPhones = Array.isArray(newVehicle.phoneNumbers)
       ? newVehicle.phoneNumbers
       : (typeof newVehicle.phoneNumbers === 'string' ? newVehicle.phoneNumbers.split(',').map(p => p.trim()) : []);
     const phoneNumbers = rawPhones.map(p => p.trim()).filter(p => p.length > 0).slice(0, 5);
+    const smsAlertStatus = (newVehicle.smsAlertStatus || newVehicle.alert_status || 'ON').toUpperCase();
 
     // Check if vehicle already exists
     const existingIndex = localVehicles.findIndex(v => v.id === vId);
@@ -733,6 +734,7 @@ app.post('/api/vehicles', async (req, res) => {
       topic: newVehicle.topic || `sedhupathi/${vId}/data`,
       broker: newVehicle.broker || 'mqtt://test.mosquitto.org:1883',
       phoneNumbers,
+      smsAlertStatus,
       routeEnabled: true,
       geofenceEnabled: true,
       deviationThreshold: 300,
@@ -755,7 +757,7 @@ app.post('/api/vehicles', async (req, res) => {
       if (db) {
         await setDoc(doc(db, 'vehicles', vId), vehicleData);
       }
-      console.log(`✅ Saved vehicle ${vId} with ${phoneNumbers.length} emergency phone numbers directly to Firebase Firestore ('vehicles')`);
+      console.log(`✅ Saved vehicle ${vId} (alert_status: ${smsAlertStatus}) with ${phoneNumbers.length} emergency phone numbers directly to Firebase Firestore ('vehicles')`);
     } catch (fbErr) {
       console.warn("⚠️ Firebase Firestore write warning:", fbErr.message);
     }
@@ -791,17 +793,18 @@ app.post('/api/vehicles', async (req, res) => {
         }
       });
 
-      // 📱 Publish MQTT Configuration Payload with 5 Phone Numbers to ESP32 Hardware Tracker
-      const configTopic = `sedhupathi/${vId}/config`;
-      const configPayload = JSON.stringify({
-        cmd: "SET_SMS_NUMBERS",
-        vehicleId: vId,
-        count: phoneNumbers.length,
+      // 📱 Publish MQTT Numbers Payload to Topic: sedhupathi/<tracker_id>/number
+      const numberTopic = `sedhupathi/${vId}/number`;
+      const numberPayload = JSON.stringify({
+        tracker_id: vId,
+        alert_status: smsAlertStatus,
+        numbers: phoneNumbers,
         phone_numbers: phoneNumbers,
         timestamp: new Date().toISOString()
       });
-      mqttClient.publish(configTopic, configPayload, { qos: 1, retain: true });
-      console.log(`📡 MQTT: Broadcasted SMS emergency numbers (${phoneNumbers.length}) to ESP32 config topic [${configTopic}]`);
+      mqttClient.publish(numberTopic, numberPayload, { qos: 1, retain: true });
+      mqttClient.publish(`sedhupathi/${vId}/config`, numberPayload, { qos: 1, retain: true });
+      console.log(`📡 MQTT: Broadcasted numbers payload to topic [${numberTopic}] (alert_status: ${smsAlertStatus}, count: ${phoneNumbers.length})`);
     }
 
     broadcast({ type: 'VEHICLE_ADDED', data: vehicleData });
@@ -881,26 +884,32 @@ app.post('/api/control/test-sms', (req, res) => {
       return res.status(400).json({ error: 'No emergency phone numbers configured for this vehicle. Please add phone numbers first.' });
     }
 
-    const cmdTopic = `sedhupathi/${vehicleId}/config`;
+    const numberTopic = `sedhupathi/${vehicleId}/number`;
+    const smsAlertStatus = vehicle.smsAlertStatus || 'ON';
     const testSmsPayload = JSON.stringify({
       cmd: "SEND_SMS_ALERT",
+      tracker_id: vehicleId,
       vehicleId,
+      alert_status: smsAlertStatus,
       alertType: "TEST_SMS",
       message: `TEST ALERT: Armstrong GPS Emergency SMS System test for ${vehicle.name} (${vehicleId}).`,
+      numbers: targetPhones,
       phone_numbers: targetPhones,
       timestamp: new Date().toISOString()
     });
 
     if (mqttClient && mqttClient.connected) {
-      mqttClient.publish(cmdTopic, testSmsPayload, { qos: 1 });
-      console.log(`📱 MQTT: Dispatched Manual Test SMS trigger to topic [${cmdTopic}] for ${targetPhones.length} numbers:`, targetPhones);
+      mqttClient.publish(numberTopic, testSmsPayload, { qos: 1 });
+      mqttClient.publish(`sedhupathi/${vehicleId}/config`, testSmsPayload, { qos: 1 });
+      console.log(`📱 MQTT: Dispatched Manual Test SMS trigger to topic [${numberTopic}] for ${targetPhones.length} numbers:`, targetPhones);
     }
 
     res.json({
       status: 'ok',
       message: `Test SMS command sent over MQTT for ${targetPhones.length} phone numbers (${targetPhones.join(', ')})`,
       phoneNumbers: targetPhones,
-      topic: cmdTopic
+      topic: numberTopic,
+      alertStatus: smsAlertStatus
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1155,21 +1164,29 @@ function checkStationaryAlert(vehicleId, lat, lng, speed, address) {
       // Broadcast instant alert notification to all connected WebSockets (Admin, Operators, Drivers)
       broadcast({ type: 'ALERT_TRIGGERED', alert: alertDoc });
 
-      // 📱 Dispatch SMS Command over MQTT to ESP32 GSM Module
+      // 📱 Dispatch SMS Command over MQTT to ESP32 GSM Module if alert_status is ON
       const vehicle = localVehicles.find(v => v.id === vehicleId);
       const targetPhones = vehicle?.phoneNumbers || [];
-      if (mqttClient && mqttClient.connected && targetPhones.length > 0) {
-        const cmdTopic = `sedhupathi/${vehicleId}/config`;
+      const alertStatus = (vehicle?.smsAlertStatus || 'ON').toUpperCase();
+
+      if (alertStatus === 'OFF') {
+        console.log(`🔇 SMS Alerts disabled (alert_status=OFF) for vehicle ${vehicleId}. Skipping SMS dispatch.`);
+      } else if (mqttClient && mqttClient.connected && targetPhones.length > 0) {
+        const numberTopic = `sedhupathi/${vehicleId}/number`;
         const smsAlertPayload = JSON.stringify({
           cmd: "SEND_SMS_ALERT",
+          tracker_id: vehicleId,
           vehicleId,
+          alert_status: "ON",
           alertType: "STATIONARY_1HR",
           message: alertDoc.message,
+          numbers: targetPhones,
           phone_numbers: targetPhones,
           timestamp: new Date().toISOString()
         });
-        mqttClient.publish(cmdTopic, smsAlertPayload, { qos: 1 });
-        console.log(`📱 MQTT: Dispatched SMS alert to ESP32 GSM Module on topic [${cmdTopic}] for ${targetPhones.length} numbers`);
+        mqttClient.publish(numberTopic, smsAlertPayload, { qos: 1 });
+        mqttClient.publish(`sedhupathi/${vehicleId}/config`, smsAlertPayload, { qos: 1 });
+        console.log(`📱 MQTT: Dispatched SMS alert to ESP32 GSM Module on topic [${numberTopic}] for ${targetPhones.length} numbers`);
       }
     }
   } else {

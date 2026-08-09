@@ -227,6 +227,7 @@ export default function App() {
 
   // Dedicated Emergency SMS Phone Numbers Form State (Max 5 Numbers for ESP32 GSM Module)
   const [smsTargetVehicleId, setSmsTargetVehicleId] = useState('');
+  const [smsAlertStatus, setSmsAlertStatus] = useState('ON'); // 'ON' or 'OFF'
   const [smsPhone1, setSmsPhone1] = useState('');
   const [smsPhone2, setSmsPhone2] = useState('');
   const [smsPhone3, setSmsPhone3] = useState('');
@@ -541,6 +542,7 @@ export default function App() {
     if (!smsTargetVehicleId) return;
     const targetVeh = vehicles.find(v => v.id === smsTargetVehicleId);
     const phones = targetVeh?.phoneNumbers || [];
+    setSmsAlertStatus(targetVeh?.smsAlertStatus || 'ON');
     setSmsPhone1(phones[0] || '');
     setSmsPhone2(phones[1] || '');
     setSmsPhone3(phones[2] || '');
@@ -569,13 +571,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...selectedVeh,
-          phoneNumbers
+          phoneNumbers,
+          smsAlertStatus
         })
       });
 
       if (res.ok) {
         await fetchVehicles();
-        alert(`📲 Updated Emergency SMS Numbers for device "${smsTargetVehicleId}" (${phoneNumbers.length} numbers synced to ESP32 via MQTT)!`);
+        alert(`📲 Updated Emergency SMS Numbers for device "${smsTargetVehicleId}" (${phoneNumbers.length} numbers, alert_status: [${smsAlertStatus}]) synced over MQTT topic [sedhupathi/${smsTargetVehicleId}/number]!`);
       } else {
         alert("Failed to update emergency contacts on server.");
       }
@@ -2743,6 +2746,52 @@ export default function App() {
                             </option>
                           ))}
                         </select>
+                      </div>
+
+                      {/* SMS Alert Master Status (ON / OFF) to block unwanted SMS alerts */}
+                      <div className="form-group" style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                        <label style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>SMS Alert Master Status</span>
+                          <span style={{ color: smsAlertStatus === 'ON' ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 800 }}>
+                            {smsAlertStatus === 'ON' ? '🟢 ON (Alerts Active)' : '🔴 OFF (Alerts Blocked)'}
+                          </span>
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.35rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSmsAlertStatus('ON')}
+                            style={{
+                              padding: '0.35rem',
+                              fontSize: '0.72rem',
+                              borderRadius: '4px',
+                              border: '1px solid',
+                              borderColor: smsAlertStatus === 'ON' ? 'var(--accent-green)' : 'var(--border-color)',
+                              backgroundColor: smsAlertStatus === 'ON' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                              color: smsAlertStatus === 'ON' ? 'var(--accent-green)' : 'var(--text-muted)',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🟢 Enable Alerts (ON)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSmsAlertStatus('OFF')}
+                            style={{
+                              padding: '0.35rem',
+                              fontSize: '0.72rem',
+                              borderRadius: '4px',
+                              border: '1px solid',
+                              borderColor: smsAlertStatus === 'OFF' ? 'var(--accent-red)' : 'var(--border-color)',
+                              backgroundColor: smsAlertStatus === 'OFF' ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                              color: smsAlertStatus === 'OFF' ? 'var(--accent-red)' : 'var(--text-muted)',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🔴 Block Alerts (OFF)
+                          </button>
+                        </div>
                       </div>
 
                       <div className="form-group">
