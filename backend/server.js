@@ -1036,38 +1036,48 @@ const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
   reconnectPeriod: 5000
 });
 
+const DEFAULT_EMERGENCY_NUMBERS = [
+  "+919740383725",
+  "+919035596960",
+  "+919876543212",
+  "+919876543213",
+  "+919876543214"
+];
+
 // 📱 CONTINUOUS RECURRING MQTT SYNC ENGINE
-// Re-broadcasts all configured Emergency Phone Numbers to MQTT every 15s so broker never loses them
+// Re-broadcasts all configured Emergency Phone Numbers & Config to MQTT every 5s continuously
 function broadcastAllVehicleNumbersMQTT() {
   if (!mqttClient || !mqttClient.connected) return;
 
-  localVehicles.forEach(vehicle => {
-    const vId = vehicle.id;
-    const phoneNumbers = vehicle.phoneNumbers || [];
+  const listToSync = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
+
+  listToSync.forEach(vehicle => {
+    const vId = vehicle.id || '2';
+    const rawPhones = (Array.isArray(vehicle.phoneNumbers) && vehicle.phoneNumbers.length > 0)
+      ? vehicle.phoneNumbers
+      : DEFAULT_EMERGENCY_NUMBERS;
+    const phoneNumbers = rawPhones.map(p => String(p).trim()).filter(p => p.length > 0).slice(0, 5);
     const smsAlertStatus = (vehicle.smsAlertStatus || 'ON').toUpperCase();
 
-    if (vId && phoneNumbers.length > 0) {
-      const numberTopic1 = `ibots/tracker/${vId}/number`;
-      const numberTopic2 = `sedhupathi/${vId}/number`;
+    const payload = JSON.stringify({
+      tracker_id: vId,
+      alert_status: smsAlertStatus,
+      numbers: phoneNumbers,
+      phone_numbers: phoneNumbers,
+      timestamp: new Date().toISOString()
+    });
 
-      const payload = JSON.stringify({
-        tracker_id: vId,
-        alert_status: smsAlertStatus,
-        numbers: phoneNumbers,
-        phone_numbers: phoneNumbers,
-        timestamp: new Date().toISOString()
-      });
-
-      mqttClient.publish(numberTopic1, payload, { qos: 1, retain: true });
-      mqttClient.publish(numberTopic2, payload, { qos: 1, retain: true });
-      mqttClient.publish(`sedhupathi/${vId}/config`, payload, { qos: 1, retain: true });
-      mqttClient.publish(`ibots/tracker/${vId}/config`, payload, { qos: 1, retain: true });
-    }
+    // Broadcast continuously across all topic variations with retain: true & qos: 1
+    mqttClient.publish(`ibots/tracker/${vId}/number`, payload, { qos: 1, retain: true });
+    mqttClient.publish(`ibots/tracker/${vId}/config`, payload, { qos: 1, retain: true });
+    mqttClient.publish(`sedhupathi/${vId}/number`, payload, { qos: 1, retain: true });
+    mqttClient.publish(`sedhupathi/${vId}/config`, payload, { qos: 1, retain: true });
+    mqttClient.publish(`ibots/${vId}/number`, payload, { qos: 1, retain: true });
   });
 }
 
-// Continuously re-publish emergency numbers every 15 seconds
-setInterval(broadcastAllVehicleNumbersMQTT, 15000);
+// Continuously re-publish emergency numbers every 5 seconds continuously
+setInterval(broadcastAllVehicleNumbersMQTT, 5000);
 
 mqttClient.on('connect', () => {
   console.log('📡 MQTT: Connected to', MQTT_BROKER_URL);
