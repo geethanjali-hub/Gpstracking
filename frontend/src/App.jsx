@@ -2770,12 +2770,12 @@ export default function App() {
                     <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Device online &amp; moving</span>
                   </div>
 
-                  <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>🔴 Total OFF / Parked Time</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ef4444', display: 'block', marginTop: '0.2rem' }}>
+                  <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>⚡ Total ON &amp; Parked Time</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b', display: 'block', marginTop: '0.2rem' }}>
                       {Math.floor(historyTrail.filter(p => (p.speed || 0) <= 3).length * 0.5 / 60)}h {Math.round(historyTrail.filter(p => (p.speed || 0) <= 3).length * 0.5 % 60)}m
                     </span>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Stationary / Power off</span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Power ON &amp; Stationary (0 km/h)</span>
                   </div>
 
                   <div className="panel-container" style={{ padding: '0.75rem', backgroundColor: 'rgba(6, 182, 212, 0.08)', border: '1px solid rgba(6, 182, 212, 0.3)' }}>
@@ -2891,14 +2891,14 @@ export default function App() {
                                 </td>
                                 <td style={{ padding: '0.45rem 0.65rem' }}>
                                   <span style={{
-                                    backgroundColor: isMoving ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                    color: isMoving ? '#10b981' : '#ef4444',
+                                    backgroundColor: isMoving ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: isMoving ? '#10b981' : '#f59e0b',
                                     fontWeight: 700,
                                     padding: '2px 6px',
                                     borderRadius: '4px',
                                     fontSize: '0.68rem'
                                   }}>
-                                    {isMoving ? '🟢 ON / MOVING' : '🛑 OFF / STATIONARY'}
+                                    {isMoving ? '🟢 DEVICE ON / MOVING' : '⚡ DEVICE ON / PARKED (0 km/h)'}
                                   </span>
                                 </td>
                                 <td style={{ padding: '0.45rem 0.65rem', fontWeight: 700, color: isMoving ? '#10b981' : 'var(--text-muted)' }}>
