@@ -1436,22 +1436,71 @@ app.get(['/api/shock/:vehicleId', '/api/shock/*'], (req, res) => {
 });
 
 // Daily Running Mileage & Hours Summary API
-app.get(['/api/summaries/:vehicleId', '/api/summaries/*'], (req, res) => {
-  const targetId = extractVehicleId(req);
-  const live = localTelemetry[targetId] || {};
+app.get(['/api/summaries/:vehicleId', '/api/summaries/*'], async (req, res) => {
+  try {
+    const targetId = extractVehicleId(req);
+    const live = localTelemetry[targetId] || {};
 
-  res.json({
-    mileageHistory: [
-      { day: 'Mon', km: 120 }, { day: 'Tue', km: 145 }, { day: 'Wed', km: 110 },
-      { day: 'Thu', km: 160 }, { day: 'Fri', km: 135 }, { day: 'Sat', km: 90 }, { day: 'Sun', km: 45 }
-    ],
-    hoursSummary: {
-      running: live.isOnline ? 4.2 : 0,
-      idle: live.isOnline ? 1.1 : 0,
-      parked: live.isOnline ? 18.7 : 24.0
-    },
-    deviationCount: 0
-  });
+    let points = [];
+    if (db) {
+      const snapshot = await getDocs(collection(db, 'telemetry_history'));
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d.vehicleId === targetId || d.topicDevice === targetId) {
+          points.push(d);
+        }
+      });
+    }
+
+    // Dynamic mileage calculation from real GPS history points
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const mileageMap = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+    
+    let totalRunningSec = 0;
+    let totalIdleSec = 0;
+
+    points.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+
+      const dtSec = (new Date(curr.timestamp) - new Date(prev.timestamp)) / 1000;
+      if (dtSec > 0 && dtSec < 3600) {
+        if ((curr.speed || 0) > 3) {
+          totalRunningSec += dtSec;
+          const distKm = ((curr.speed || 0) * (dtSec / 3600));
+          const dayName = days[new Date(curr.timestamp).getDay()];
+          if (mileageMap[dayName] !== undefined) {
+            mileageMap[dayName] += distKm;
+          }
+        } else {
+          totalIdleSec += dtSec;
+        }
+      }
+    }
+
+    const mileageHistory = Object.keys(mileageMap).map(day => ({
+      day,
+      km: parseFloat(mileageMap[day].toFixed(1))
+    }));
+
+    const runningHrs = parseFloat((totalRunningSec / 3600).toFixed(1));
+    const idleHrs = parseFloat((totalIdleSec / 3600).toFixed(1));
+    const parkedHrs = live.isOnline ? parseFloat(Math.max(0, 24 - runningHrs - idleHrs).toFixed(1)) : 24.0;
+
+    res.json({
+      mileageHistory,
+      hoursSummary: {
+        running: runningHrs,
+        idle: idleHrs,
+        parked: parkedHrs
+      },
+      deviationCount: 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/alerts', async (req, res) => {
@@ -1473,21 +1522,33 @@ app.get('/api/alerts', async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HARDWARE LIVENESS & OFFLINE DETECTION MONITOR
-// Runs every 4 seconds — marks device offline if no packet for > 20s
+// Runs every 4 seconds — checks ALL registered vehicles and marks offline if no packet for > 20s
 // ═══════════════════════════════════════════════════════════════════════════
 const deviceLastSeen = new Map();
 const OFFLINE_TIMEOUT_MS = 20000; // Mark device offline if no packet for > 20s
 
 setInterval(() => {
   const now = Date.now();
-  for (const [vId, lastSeen] of deviceLastSeen.entries()) {
-    if (now - lastSeen > OFFLINE_TIMEOUT_MS) {
-      const existingDoc = localTelemetryByTopic[vId] || localTelemetry[vId];
-      if (existingDoc && existingDoc.isOnline !== false) {
-        console.log(`⚠️ Heartbeat Alert: Hardware device/topic ${vId} went OFFLINE (No MQTT packet for >20s)`);
+  const activeVehicles = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
+
+  activeVehicles.forEach(vehicle => {
+    const vId = vehicle.id;
+    const topic = vehicle.topic;
+
+    const lastSeenByVehicle = deviceLastSeen.get(vId) || 0;
+    const lastSeenByTopic = topic ? (deviceLastSeen.get(topic) || 0) : 0;
+    const mostRecentSeen = Math.max(lastSeenByVehicle, lastSeenByTopic);
+
+    const isHardwareActive = (now - mostRecentSeen) <= OFFLINE_TIMEOUT_MS && mostRecentSeen > 0;
+    const existingDoc = localTelemetryByTopic[topic] || localTelemetry[vId];
+
+    if (!isHardwareActive) {
+      if (!existingDoc || existingDoc.isOnline !== false || existingDoc.status !== 'offline') {
+        console.log(`⚠️ Heartbeat Scanner: Device "${vId}" is OFFLINE (No live MQTT packet in last 20s)`);
         
         const offlineDoc = {
-          ...existingDoc,
+          vehicleId: vId,
+          topic: topic || `sedhupathi/${vId}/data`,
           isOnline: false,
           status: 'offline',
           lat: null,
@@ -1500,25 +1561,17 @@ setInterval(() => {
           speed: 0,
           rpm: 0,
           satellites: 0,
-          lastSeen: new Date(lastSeen).toISOString(),
-          offlineNotice: 'DEVICE POWERED OFF / DISCONNECTED'
+          lastSeen: mostRecentSeen ? new Date(mostRecentSeen).toISOString() : 'Never',
+          offlineNotice: 'NO LIVE MQTT TELEMETRY RECEIVED'
         };
 
-
-        if (existingDoc.topic) {
-          localTelemetryByTopic[existingDoc.topic] = offlineDoc;
-        }
+        if (topic) localTelemetryByTopic[topic] = offlineDoc;
         localTelemetry[vId] = offlineDoc;
         broadcast({ type: 'TELEMETRY_UPDATE', vehicleId: vId, data: offlineDoc });
-
-
-        if (rtdb) {
-          set(ref(rtdb, 'telemetry/' + vId), offlineDoc).catch(() => {});
-        }
       }
     }
-  }
-}, 5000);
+  });
+}, 4000);
 
 
 // Authenticate Backend Server with Firebase Auth
