@@ -39,11 +39,11 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
 
-  const isOff = !telemetryData || telemetryData.isOnline === false || telemetryData.status === 'offline' || telemetryData.isOnline !== true;
-  const hasCoords = typeof telemetryData.lat === 'number' && typeof telemetryData.lng === 'number' && !isNaN(telemetryData.lat) && telemetryData.lat !== 0;
-  // NEVER show fake static coords for offline devices — only show real MQTT coordinates
-  const lat = hasCoords ? telemetryData.lat : null;
-  const lng = hasCoords ? telemetryData.lng : null;
+  const isOff = !telemetryData || telemetryData.isOnline !== true;
+  const hasCoords = typeof telemetryData?.lat === 'number' && typeof telemetryData?.lng === 'number' && !isNaN(telemetryData.lat) && telemetryData.lat !== 0;
+  // Only use real MQTT coordinates — never fake static coords
+  const lat = hasCoords ? telemetryData.lat : 11.02366;
+  const lng = hasCoords ? telemetryData.lng : 76.9424;
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -58,7 +58,7 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
       attributionControl: false,
       dragging: !L.Browser.mobile,
       tap: false
-    }).setView([(lat || 11.02366), (lng || 76.9424)], hasCoords ? 15 : 12);
+    }).setView([lat, lng], hasCoords ? 15 : 11);
 
     mapInstanceRef.current = map;
 
@@ -66,32 +66,35 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
       maxZoom: 19
     }).addTo(map);
 
-    const iconHtml = `<div style="
-      width: 32px; height: 32px;
-      background: ${isOff ? '#ef4444' : '#0284c7'};
-      border: 2.5px solid white;
-      border-radius: 50%;
-      box-shadow: 0 0 12px ${isOff ? 'rgba(239,68,68,0.7)' : 'rgba(2,132,199,0.7)'};
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; color: white;
-    ">📡</div>`;
+    // Only add marker if we have REAL GPS coordinates from MQTT
+    if (hasCoords) {
+      const iconHtml = `<div style="
+        width: 32px; height: 32px;
+        background: ${isOff ? '#ef4444' : '#0284c7'};
+        border: 2.5px solid white;
+        border-radius: 50%;
+        box-shadow: 0 0 12px ${isOff ? 'rgba(239,68,68,0.7)' : 'rgba(2,132,199,0.7)'};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px; color: white;
+      ">📡</div>`;
 
-    const customIcon = L.divIcon({
-      html: iconHtml,
-      className: '',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
-    });
+      const customIcon = L.divIcon({
+        html: iconHtml,
+        className: '',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
 
-    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
-    marker.bindPopup(`
-      <div style="font-family: sans-serif; font-size: 12px; color: #0f172a; padding: 2px;">
-        <strong style="color: #0284c7;">${vehicle.name}</strong><br/>
-        <b>Status:</b> ${isOff ? '🔴 Offline' : '🟢 Live GPS'}<br/>
-        <b>Speed:</b> ${telemetryData.speed || 0} km/h
-      </div>
-    `);
-    markerRef.current = marker;
+      const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+      marker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 12px; color: #0f172a; padding: 2px;">
+          <strong style="color: #0284c7;">${vehicle.name}</strong><br/>
+          <b>Status:</b> ${isOff ? '🔴 Offline' : '🟢 Live GPS'}<br/>
+          <b>Speed:</b> ${telemetryData?.speed || 0} km/h
+        </div>
+      `);
+      markerRef.current = marker;
+    }
 
     setTimeout(() => {
       if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
@@ -737,12 +740,28 @@ export default function App() {
           } else {
             setSelectedVehicleId('');
           }
+
+          // Immediately fetch live telemetry for all vehicles so status is correct from first render
+          // This prevents the "all online" flash before WebSocket connects
+          try {
+            const tRes = await fetch(`${API_BASE}/api/telemetry`);
+            if (tRes.ok) {
+              const tData = await tRes.json();
+              if (tData && typeof tData === 'object') {
+                for (const vid in tData) {
+                  applyTelemetryUpdate(vid, tData[vid]);
+                }
+              }
+            }
+          } catch (tErr) {
+            console.warn('Telemetry prefetch warning:', tErr.message);
+          }
+
           return;
         }
-
       }
     } catch (err) {
-      console.warn("Failed to fetch vehicles from server DB:", err);
+      console.warn('Failed to fetch vehicles from server DB:', err);
     }
   };
 
