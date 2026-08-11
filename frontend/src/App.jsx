@@ -1679,6 +1679,20 @@ export default function App() {
     <div className="app-container">
       {/* Side Bar navigation panel */}
       <aside className="sidebar">
+        {mobileMenuOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 998
+            }}
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
         <div className="brand">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div className="brand-icon">
@@ -1693,7 +1707,7 @@ export default function App() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Navigation Menu"
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileMenuOpen ? <X size={20} style={{ color: '#000', stroke: '#000' }} /> : <Menu size={20} style={{ color: '#000', stroke: '#000' }} />}
           </button>
         </div>
 
@@ -1732,18 +1746,18 @@ export default function App() {
               </span>
             </li>
             <li>
-              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
+              <span className={`nav-link ${activeTab === 'battery' ? 'active' : ''}`} onClick={() => { setActiveTab('battery'); setMobileMenuOpen(false); }}>
                 <Battery size={14} /> Backup Battery Status
               </span>
             </li>
             <li>
-              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
+              <span className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => { setActiveTab('summary'); setMobileMenuOpen(false); }}>
                 <FileText size={14} /> Daily Running Summary
               </span>
             </li>
             {role !== 'viewer' && (
               <li>
-                <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
+                <span className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }}>
                   <FileText size={14} style={{ color: 'var(--accent-cyan)' }} /> Telematics Reports
                 </span>
               </li>
