@@ -2410,21 +2410,21 @@ export default function App() {
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentStreet[selectedVehicleId] || currentData.street || 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.street || currentStreet[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentArea[selectedVehicleId] || currentData.area || 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.area || currentArea[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address &amp; PIN</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentAddress[selectedVehicleId] || currentData.address || 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.address || currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                   </span>
                 </div>
 

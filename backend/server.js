@@ -513,11 +513,35 @@ async function getAddressFromCoords(lat, lng) {
     return addressCache.get(key);
   }
 
+async function getAddressFromCoords(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+    return {
+      address: "No Signal — Device Offline",
+      street: "Offline",
+      road: "Offline",
+      area: "Offline",
+      suburb: "Offline",
+      city: "",
+      state: "",
+      postcode: ""
+    };
+  }
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  if (addressCache.has(key)) {
+    return addressCache.get(key);
+  }
+
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=en`;
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'IBOTS-GPS-Tracking/1.0 (admin@ibots.academy)' }
+      signal: controller.signal,
+      headers: { 'User-Agent': 'ARMSTRONG-GPS-Tracking/2.0 (admin@armstrongtelematics.com)' }
     });
+    clearTimeout(timeoutId);
+
     if (response.ok) {
       const data = await response.json();
       const a = data.address || {};
@@ -542,15 +566,15 @@ async function getAddressFromCoords(lat, lng) {
       return result;
     }
   } catch (err) {
-    console.warn('⚠️ Reverse geocoding fetch warning:', err.message);
+    console.warn('⚠️ Reverse geocoding timeout/warning:', err.message);
   }
 
   const fallback = {
-    address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    address: `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
     street: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
     road: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-    area: 'Live Coordinates',
-    suburb: 'Live Coordinates',
+    area: 'Live Location',
+    suburb: 'Live Location',
     city: '',
     state: '',
     postcode: ''
