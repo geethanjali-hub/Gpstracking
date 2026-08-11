@@ -1677,22 +1677,13 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Mobile Drawer Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div className="mobile-drawer-backdrop" onClick={() => setMobileMenuOpen(false)} />
+      )}
+
       {/* Side Bar navigation panel */}
-      <aside className="sidebar">
-        {mobileMenuOpen && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              zIndex: 998
-            }}
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="brand">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div className="brand-icon">
@@ -1703,11 +1694,14 @@ export default function App() {
 
           <button
             type="button"
-            className="mobile-menu-toggle"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle Navigation Menu"
+            className="mobile-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMobileMenuOpen(false);
+            }}
+            aria-label="Close Navigation Menu"
           >
-            {mobileMenuOpen ? <X size={20} style={{ color: '#000', stroke: '#000' }} /> : <Menu size={20} style={{ color: '#000', stroke: '#000' }} />}
+            <X size={20} style={{ color: '#000000', stroke: '#000000', strokeWidth: 2.5 }} />
           </button>
         </div>
 
@@ -1791,26 +1785,38 @@ export default function App() {
       {/* Main Board view */}
       <main className="main-content">
         <header className="topbar">
-          <h2 className="page-title">
-            {activeTab === 'home' && 'Dashboard Home'}
-            {activeTab === 'tracking' && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-                Live Tracking
-                <span style={{ fontSize: '0.85rem', color: '#06b6d4', fontWeight: 700, backgroundColor: 'rgba(6, 182, 212, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(6, 182, 212, 0.4)' }}>
-                  {selectedVehicle ? `📡 ${selectedVehicle.name} (${selectedVehicle.id})` : '⚠️ No Device Selected'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              type="button"
+              className="mobile-hamburger-btn"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open Navigation Menu"
+            >
+              <Menu size={20} style={{ color: '#000000', stroke: '#000000', strokeWidth: 2.5 }} />
+              <span>MENU</span>
+            </button>
+
+            <h2 className="page-title">
+              {activeTab === 'home' && 'Dashboard Home'}
+              {activeTab === 'tracking' && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                  Live Tracking
+                  <span style={{ fontSize: '0.85rem', color: '#06b6d4', fontWeight: 700, backgroundColor: 'rgba(6, 182, 212, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(6, 182, 212, 0.4)' }}>
+                    {selectedVehicle ? `📡 ${selectedVehicle.name} (${selectedVehicle.id})` : '⚠️ No Device Selected'}
+                  </span>
                 </span>
-              </span>
-            )}
-            {activeTab === 'gallery' && 'Fleet Gallery Grid Overview'}
-            {activeTab === 'navigation' && 'Google Maps Navigation & Real-Time ETA'}
-            {activeTab === 'stoppages' && 'Stoppage & Dwell Time Analytics'}
-            {activeTab === 'engine' && 'Engine Health'}
-            {activeTab === 'fuel' && 'Fuel Monitoring'}
-            {activeTab === 'battery' && 'Backup Battery Status'}
-            {activeTab === 'summary' && 'Daily Running Summary'}
-            {activeTab === 'reports' && 'Reports Generation'}
-            {activeTab === 'settings' && 'User Management'}
-          </h2>
+              )}
+              {activeTab === 'gallery' && 'Fleet Gallery Grid Overview'}
+              {activeTab === 'navigation' && 'Google Maps Navigation & Real-Time ETA'}
+              {activeTab === 'stoppages' && 'Stoppage & Dwell Time Analytics'}
+              {activeTab === 'engine' && 'Engine Health'}
+              {activeTab === 'fuel' && 'Fuel Monitoring'}
+              {activeTab === 'battery' && 'Backup Battery Status'}
+              {activeTab === 'summary' && 'Daily Running Summary'}
+              {activeTab === 'reports' && 'Reports Generation'}
+              {activeTab === 'settings' && 'User Management'}
+            </h2>
+          </div>
 
           <div className="topbar-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
