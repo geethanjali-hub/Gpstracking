@@ -180,8 +180,8 @@ function NavRouteMap({ navData, vehicleData }) {
   }, [navData, vehicleData?.id]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '380px', borderRadius: '8px', overflow: 'hidden' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '380px', zIndex: 1 }} />
+    <div className="responsive-map-container">
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
     </div>
   );
 }
@@ -246,8 +246,8 @@ function StoppageMap({ stoppages, historyPoints, selectedVehicle }) {
   }, [stoppages, selectedVehicle?.id]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '520px', borderRadius: '8px', overflow: 'hidden' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '520px', zIndex: 1 }} />
+    <div className="responsive-map-container">
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
     </div>
   );
 }
@@ -1740,18 +1740,18 @@ export default function App() {
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'battery' ? 'active' : ''}`} onClick={() => { setActiveTab('battery'); setMobileMenuOpen(false); }}>
+              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                 <Battery size={14} /> Backup Battery Status
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => { setActiveTab('summary'); setMobileMenuOpen(false); }}>
+              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                 <FileText size={14} /> Daily Running Summary
               </span>
             </li>
             {role !== 'viewer' && (
               <li>
-                <span className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }}>
+                <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
                   <FileText size={14} style={{ color: 'var(--accent-cyan)' }} /> Telematics Reports
                 </span>
               </li>
@@ -2381,7 +2381,7 @@ export default function App() {
               )}
 
               <div className="responsive-two-col-grid">
-                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', minHeight: '380px', position: 'relative' }}>
+                <div className="panel-container responsive-map-container" style={{ padding: 0 }}>
                   <div style={{
                     position: 'absolute',
                     top: '12px',
@@ -2405,7 +2405,7 @@ export default function App() {
                       : `🔴 OFFLINE: ${selectedVehicle?.name || 'Device'} — No MQTT Signal`
                     }
                   </div>
-                  <div ref={trackingMapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
+                  <div ref={trackingMapRef} style={{ width: '100%', height: '100%', minHeight: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
                 <div className="panel-container">
                   <span className="panel-title"><Compass size={14} /> 📡 {selectedVehicle ? selectedVehicle.name : 'Device'} Details</span>

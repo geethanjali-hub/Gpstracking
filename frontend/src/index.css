@@ -644,6 +644,15 @@ body {
   gap: 1.25rem;
 }
 
+.responsive-map-container {
+  width: 100%;
+  height: 480px;
+  min-height: 480px;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
 .responsive-four-col-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -822,9 +831,18 @@ body {
   [style*="grid-template-columns: 2fr"],
   [style*="grid-template-columns: 1.5fr"],
   [style*="grid-template-columns: repeat(3,"],
-  [style*="grid-template-columns: repeat(4,"] {
+  .responsive-two-col-grid,
+  .responsive-three-col-grid,
+  .responsive-four-col-grid {
     grid-template-columns: 1fr !important;
     height: auto !important;
+    min-height: auto !important;
+  }
+
+  .responsive-map-container,
+  .responsive-map-container div[ref] {
+    height: 320px !important;
+    min-height: 320px !important;
   }
 
   .admin-fleet-grid {
