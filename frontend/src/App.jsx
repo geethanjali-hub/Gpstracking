@@ -3346,7 +3346,7 @@ export default function App() {
                           className="form-input"
                           value={smsTargetVehicleId}
                           onChange={e => setSmsTargetVehicleId(e.target.value)}
-                          style={{ width: '100%', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}
+                          style={{ width: '100%', backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0' }}
                         >
                           {vehicles.map(v => (
                             <option key={v.id} value={v.id}>
@@ -3456,32 +3456,33 @@ export default function App() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                                backgroundColor: '#ffffff',
                                 padding: '0.65rem 0.85rem',
                                 borderRadius: '6px',
-                                border: '1px solid var(--border-color)'
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
                               }}
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
                                   📡 {v.name}
                                 </strong>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+                                <div style={{ fontSize: '0.72rem', color: '#0284c7', fontFamily: 'var(--font-mono)' }}>
                                   🆔 Tracker ID: <b>{v.id}</b>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                                  🛰️ Topic: <code style={{ color: '#38bdf8' }}>{v.topic || `sedhupathi/${v.id}/data`}</code>
+                                <div style={{ fontSize: '0.7rem', color: '#475569' }}>
+                                  🛰️ Topic: <code style={{ color: '#0369a1' }}>{v.topic || `sedhupathi/${v.id}/data`}</code>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                  🌐 Broker: <code style={{ color: '#a7f3d0' }}>{v.broker || 'mqtt://test.mosquitto.org:1883'}</code>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  🌐 Broker: <code style={{ color: '#047857' }}>{v.broker || 'mqtt://test.mosquitto.org:1883'}</code>
                                 </div>
                                 {phones.length > 0 && (
-                                  <div style={{ fontSize: '0.68rem', color: 'var(--accent-orange)', fontWeight: 600 }}>
+                                  <div style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600 }}>
                                     📱 SMS Emergency Contacts ({phones.length}): {phones.join(', ')}
                                   </div>
                                 )}
                                 {(v.userName || mappedUser?.name) && (
-                                  <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                  <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
                                     👤 User: {v.userName || mappedUser?.name}
                                   </div>
                                 )}
