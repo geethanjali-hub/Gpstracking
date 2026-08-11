@@ -1181,12 +1181,17 @@ export default function App() {
 
     const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
     const currentData = selectedVehicle ? (telemetry[selectedVehicleId] || {}) : {};
-    const hasValidCoords = !!selectedVehicle && currentData.lat != null && currentData.lng != null && currentData.isOnline !== false;
+    const hasValidCoords = !!selectedVehicle && currentData.lat != null && currentData.lng != null && currentData.isOnline === true;
     const mapInstanceRef = activeTab === 'home' ? dashboardMapInstance : trackingMapInstance;
     const markerRef = activeTab === 'home' ? dashboardMarkerInstance : trackingMarkerInstance;
-    const centerCoords = hasValidCoords
-      ? [currentData.lat, currentData.lng]
-      : (mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : [11.00659, 77.01404]);
+
+    // For home tab: center on first online device, or default to Coimbatore
+    const onlineDevices = vehicles.filter(v => telemetry[v.id]?.isOnline === true && telemetry[v.id]?.lat != null);
+    const firstOnline = onlineDevices[0] ? telemetry[onlineDevices[0].id] : null;
+    const centerCoords = activeTab === 'home'
+      ? (firstOnline ? [firstOnline.lat, firstOnline.lng] : [11.02366, 76.9424])
+      : (hasValidCoords ? [currentData.lat, currentData.lng]
+          : (mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : [11.00659, 77.01404]));
 
     // Initialize Leaflet Map if container changed or map is not active
     if (!mapInstanceRef.current || mapInstanceRef.current._container !== container) {
@@ -1202,10 +1207,9 @@ export default function App() {
         delete container._leaflet_id;
       }
 
-      const map = L.map(container, { zoomControl: false }).setView(centerCoords, hasValidCoords ? 16 : 13);
+      const map = L.map(container, { zoomControl: false }).setView(centerCoords, activeTab === 'home' ? 14 : (hasValidCoords ? 16 : 13));
       mapInstanceRef.current = map;
 
-      // Google Maps Vector-Style Vector Tiles (CARTO Voyager Theme)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         subdomains: 'abcd',
@@ -1219,7 +1223,59 @@ export default function App() {
       }, 250);
     }
 
-    // Update marker and view smoothly without tearing or map flickering
+    // ═══ DASHBOARD HOME: Show ALL devices as fleet markers ═══
+    if (activeTab === 'home' && mapInstanceRef.current) {
+      // Remove old fleet markers layer group if exists
+      if (mapInstanceRef.current._fleetMarkersGroup) {
+        mapInstanceRef.current._fleetMarkersGroup.clearLayers();
+      } else {
+        mapInstanceRef.current._fleetMarkersGroup = L.layerGroup().addTo(mapInstanceRef.current);
+      }
+
+      vehicles.forEach(v => {
+        const t = telemetry[v.id] || {};
+        const isOnline = t.isOnline === true;
+        const hasCoords = t.lat != null && t.lng != null && typeof t.lat === 'number';
+        if (!hasCoords) return; // Skip devices with no real GPS coords
+
+        const markerColor = isOnline ? '#10b981' : '#ef4444';
+        const iconHtml = `<div style="
+          width: 32px; height: 32px;
+          background: ${markerColor};
+          border: 2.5px solid white;
+          border-radius: 50%;
+          box-shadow: 0 0 14px ${markerColor};
+          display:flex; align-items:center; justify-content:center;
+          font-size: 14px; color: white; font-weight: bold;
+        ">${isOnline ? '🟢' : '🔴'}</div>`;
+
+        const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [32, 32], iconAnchor: [16, 16] });
+        const popup = `
+          <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:160px">
+            <strong style="color:#0891b2">📡 ${v.name}</strong><br/>
+            <b>Status:</b> <span style="color:${markerColor};font-weight:bold">${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}</span><br/>
+            <b>Speed:</b> ${t.speed || 0} km/h<br/>
+            <b>Location:</b> ${t.address || `${t.lat?.toFixed(5)}, ${t.lng?.toFixed(5)}`}
+          </div>`;
+
+        const marker = L.marker([t.lat, t.lng], { icon }).addTo(mapInstanceRef.current._fleetMarkersGroup);
+        marker.bindPopup(popup);
+      });
+
+      // Fit map bounds to show all online devices
+      if (onlineDevices.length > 0) {
+        const bounds = onlineDevices
+          .map(v => telemetry[v.id])
+          .filter(t => t?.lat != null)
+          .map(t => [t.lat, t.lng]);
+        if (bounds.length > 1) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+        }
+      }
+      return;
+    }
+
+    // ═══ LIVE TRACKING TAB: Single selected vehicle with heading arrow ═══
     if (activeTab === 'tracking' && mapInstanceRef.current) {
       if (hasValidCoords) {
         const currentCoords = [currentData.lat, currentData.lng];
@@ -1238,9 +1294,7 @@ export default function App() {
           </div>
         `;
 
-
         if (markerRef.current) {
-          // Update position smoothly without tile reset
           markerRef.current.setLatLng(currentCoords);
           markerRef.current.getPopup()?.setContent(popupContent);
 
@@ -1275,7 +1329,7 @@ export default function App() {
           prevCoordsRef.current = currentCoords;
         }
 
-        // Only pan map if position changed significantly (> ~10 meters) to avoid map tile flickering
+        // Only pan map if position changed significantly (> ~10 meters)
         const prev = prevCoordsRef.current;
         if (!prev || Math.abs(prev[0] - currentCoords[0]) > 0.0001 || Math.abs(prev[1] - currentCoords[1]) > 0.0001) {
           mapInstanceRef.current.panTo(currentCoords, { animate: true, duration: 0.5 });
@@ -1288,7 +1342,7 @@ export default function App() {
         }
       }
     }
-  }, [activeTab, selectedVehicleId, telemetry]);
+  }, [activeTab, selectedVehicleId, telemetry, vehicles]);
 
   // Render Charts (Telemetry line history)
   useEffect(() => {
@@ -2331,8 +2385,8 @@ export default function App() {
                     alignItems: 'center',
                     gap: '0.4rem'
                   }}>
-                    <span style={{ backgroundColor: selectedVehicle ? '#10b981' : '#ef4444', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
-                    📡 Active Hardware Tracker: {selectedVehicle ? `${selectedVehicle.name} (${selectedVehicle.id})` : 'None Registered'}
+                    <span style={{ backgroundColor: (currentData.isOnline === true) ? '#10b981' : '#ef4444', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
+                    {currentData.isOnline === true ? `📡 LIVE: ${selectedVehicle?.name || 'Device'} (${selectedVehicleId})` : `🔴 OFFLINE: ${selectedVehicle?.name || 'Device'} — No MQTT Signal`}
                   </div>
                   <div ref={trackingMapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
