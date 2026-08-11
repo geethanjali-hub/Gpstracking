@@ -26,7 +26,9 @@ import {
   Radio,
   Navigation,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  Menu,
+  X
 } from 'lucide-react';
 import Chart from 'chart.js/auto';
 import L from 'leaflet';
@@ -637,6 +639,9 @@ export default function App() {
     if (statusFilter === 'low_fuel') return (t.fuelLevel || 0) < 15;
     return true;
   });
+
+  // Mobile Hamburger Navigation Drawer State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Map and Chart Refs
   const dashboardMapRef = useRef(null);
@@ -1675,43 +1680,54 @@ export default function App() {
       {/* Side Bar navigation panel */}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-icon">
-            <Shield size={16} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="brand-icon">
+              <Shield size={16} />
+            </div>
+            <span className="brand-name">ARMSTRONG GPS</span>
           </div>
-          <span className="brand-name">ARMSTRONG GPS</span>
+
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
 
-        <nav>
+        <nav className={`nav-menu-container ${mobileMenuOpen ? 'open' : ''}`}>
           <ul className="nav-menu">
             {role !== 'viewer' && (
               <li>
-                <span className={`nav-link ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}>
+                <span className={`nav-link ${activeTab === 'home' ? 'active' : ''}`} onClick={() => { setActiveTab('home'); setMobileMenuOpen(false); }}>
                   <Gauge size={14} /> {role === 'operator' ? 'Factory Operations' : 'Dashboard Home'}
                 </span>
               </li>
             )}
             <li>
-              <span className={`nav-link ${activeTab === 'tracking' ? 'active' : ''}`} onClick={() => setActiveTab('tracking')}>
+              <span className={`nav-link ${activeTab === 'tracking' ? 'active' : ''}`} onClick={() => { setActiveTab('tracking'); setMobileMenuOpen(false); }}>
                 <Map size={14} /> {role === 'viewer' ? 'My Live Tracking' : 'Live Tracking'}
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => setActiveTab('gallery')}>
+              <span className={`nav-link ${activeTab === 'gallery' ? 'active' : ''}`} onClick={() => { setActiveTab('gallery'); setMobileMenuOpen(false); }}>
                 <LayoutGrid size={14} style={{ color: 'var(--accent-cyan)' }} /> Fleet Gallery Grid
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
+              <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
                 <Clock size={14} style={{ color: '#8b5cf6' }} /> Route History Replay
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'navigation' ? 'active' : ''}`} onClick={() => setActiveTab('navigation')}>
+              <span className={`nav-link ${activeTab === 'navigation' ? 'active' : ''}`} onClick={() => { setActiveTab('navigation'); setMobileMenuOpen(false); }}>
                 <Navigation size={14} style={{ color: '#06b6d4' }} /> Google Maps Nav &amp; ETA
               </span>
             </li>
             <li>
-              <span className={`nav-link ${activeTab === 'stoppages' ? 'active' : ''}`} onClick={() => { setActiveTab('stoppages'); if (selectedVehicleId) fetchStoppageAnalytics(selectedVehicleId); }}>
+              <span className={`nav-link ${activeTab === 'stoppages' ? 'active' : ''}`} onClick={() => { setActiveTab('stoppages'); setMobileMenuOpen(false); if (selectedVehicleId) fetchStoppageAnalytics(selectedVehicleId); }}>
                 <Compass size={14} style={{ color: '#ef4444' }} /> Stoppage Analytics
               </span>
             </li>
@@ -1734,7 +1750,7 @@ export default function App() {
             )}
             {role === 'admin' && (
               <li>
-                <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}>
                   <User size={14} /> User Management
                 </span>
               </li>
