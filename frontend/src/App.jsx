@@ -1867,7 +1867,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className="module-view">
+        <div className="module-view" style={{ marginTop: '1.25rem' }}>
           
           {/* Critical notification bar */}
           {alerts.filter(a => a.severity === 'critical').slice(0, 1).map(alert => (
