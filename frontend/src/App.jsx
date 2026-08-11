@@ -611,7 +611,7 @@ export default function App() {
   // Distance calculator based on selected Date Filter Mode
   const getFilteredKm = (vId) => {
     const t = telemetry[vId] || {};
-    const baseKm = t.todayRunningKm || 12.5;
+    const baseKm = t.todayRunningKm || 0;
     if (dateFilterMode === 'today') return baseKm.toFixed(1);
     if (dateFilterMode === 'yesterday') return (baseKm * 1.8).toFixed(1);
     if (dateFilterMode === 'week') return (baseKm * 7.2).toFixed(1);
@@ -2162,8 +2162,9 @@ export default function App() {
                           filteredVehicles.map((v) => {
                             const t = telemetry[v.id] || {};
                             const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
-                            const toAddr = t.fix && t.isOnline === true ? (currentAddress[v.id] || 'Transmitting Data') : 'Location Unavailable';
-                            const isLive = t.isOnline === true && (t.fix || t.lat);
+                            const isLive = t.isOnline === true && t.lat != null && typeof t.lat === 'number';
+                            const toAddr = isLive ? (t.address || currentAddress[v.id] || `${t.lat.toFixed(5)}, ${t.lng.toFixed(5)}`) : 'Location Unavailable — Device Offline';
+                            const isMoving = isLive && (t.speed || 0) > 0;
 
                             return (
                               <tr
@@ -2186,14 +2187,14 @@ export default function App() {
                                 <td style={{ padding: '0.65rem 0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#38bdf8' }}>
                                   {v.topic || `sedhupathi/${v.id}/data`}
                                 </td>
-                                <td style={{ padding: '0.65rem 0.75rem', color: 'var(--text-secondary)' }}>
+                                <td style={{ padding: '0.65rem 0.75rem', color: isLive ? 'var(--text-primary)' : 'var(--accent-red)', fontWeight: isLive ? 500 : 600 }}>
                                   📍 {toAddr}
                                 </td>
                                 <td style={{ padding: '0.65rem 0.75rem' }}>
-                                  {(!isLive || (t.speed || 0) <= 3) ? (
+                                  {!isLive ? (
                                     <span
                                       style={{
-                                        backgroundColor: 'rgba(239, 68, 68, 0.22)',
+                                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
                                         color: '#ef4444',
                                         fontWeight: 800,
                                         padding: '3px 8px',
@@ -2202,27 +2203,44 @@ export default function App() {
                                         fontSize: '0.7rem',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '4px',
-                                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)'
+                                        gap: '4px'
                                       }}
                                     >
-                                      🛑 Stationary &gt; 1 Hr
+                                      🔴 OFFLINE
                                     </span>
-                                  ) : (
+                                  ) : isMoving ? (
                                     <span
                                       style={{
                                         backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                                        color: 'var(--accent-green)',
-                                        fontWeight: 700,
+                                        color: '#16a34a',
+                                        fontWeight: 800,
                                         padding: '3px 8px',
                                         borderRadius: '4px',
+                                        border: '1px solid #16a34a',
                                         fontSize: '0.7rem',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '4px'
                                       }}
                                     >
-                                      🟢 Live Moving
+                                      🟢 MOVING ({t.speed || 0} km/h)
+                                    </span>
+                                  ) : (
+                                    <span
+                                      style={{
+                                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                        color: '#d97706',
+                                        fontWeight: 800,
+                                        padding: '3px 8px',
+                                        borderRadius: '4px',
+                                        border: '1px solid #d97706',
+                                        fontSize: '0.7rem',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      🟡 PARKED / IDLE
                                     </span>
                                   )}
                                 </td>
