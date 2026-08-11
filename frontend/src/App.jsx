@@ -2318,7 +2318,7 @@ export default function App() {
           {/* MAP TAB */}
           {activeTab === 'tracking' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {(currentData.isOnline === false || currentData.status === 'offline') && (
+              {(currentData.isOnline !== true || !currentData.lat) && (
                 <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.18)', border: '1px solid #ef4444', borderRadius: '6px', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <AlertOctagon size={18} style={{ color: '#ef4444' }} />
@@ -2372,8 +2372,8 @@ export default function App() {
 
                   <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Hardware Device Status</span>
-                    <strong style={{ fontSize: '0.72rem', color: (currentData.isOnline === false || currentData.status === 'offline') ? 'var(--accent-red)' : currentData.fix ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
-                      {(currentData.isOnline === false || currentData.status === 'offline') ? '🔴 POWERED OFF / OFFLINE' : currentData.fix ? '🟢 ONLINE / LIVE GPS FIX' : '🟡 ONLINE / INDOOR STANDBY'}
+                    <strong style={{ fontSize: '0.72rem', color: (currentData.isOnline !== true || !currentData.lat) ? 'var(--accent-red)' : currentData.fix ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                      {(currentData.isOnline !== true || !currentData.lat) ? '🔴 POWERED OFF / OFFLINE' : currentData.fix ? '🟢 ONLINE / LIVE GPS FIX' : '🟡 ONLINE / INDOOR STANDBY'}
                     </strong>
                   </div>
 
@@ -2404,27 +2404,27 @@ export default function App() {
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.isOnline !== false ? 'Live Hardware Stream' : 'Offline'}</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.isOnline === true && currentData.lat ? 'Live Hardware Stream' : 'Offline'}</span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentStreet[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentStreet[selectedVehicleId] || currentData.street || 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentArea[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentArea[selectedVehicleId] || currentData.area || 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address &amp; PIN</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline === false || currentData.status === 'offline' ? 'Offline' : (currentAddress[selectedVehicleId] || 'Awaiting Live GPS Signal...')}
+                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentAddress[selectedVehicleId] || currentData.address || 'Awaiting Live GPS Signal...')}
                   </span>
                 </div>
 
@@ -2471,7 +2471,8 @@ export default function App() {
               <div className="admin-fleet-grid">
                 {vehicles.map(v => {
                   const tData = telemetry[v.id] || {};
-                  const isOff = tData.isOnline === false || tData.status === 'offline';
+                  const isOnline = tData.isOnline === true && tData.lat != null && typeof tData.lat === 'number' && tData.lat !== 0;
+                  const isOff = !isOnline;
                   return (
                     <div key={v.id} className="fleet-card" style={{ borderTop: `4px solid ${isOff ? '#ef4444' : '#0284c7'}` }}>
                       <div className="fleet-card-header">
