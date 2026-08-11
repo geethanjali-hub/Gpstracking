@@ -2320,8 +2320,8 @@ export default function App() {
                     left: '12px',
                     zIndex: 1000,
                     backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    border: '1px solid #06b6d4',
-                    color: '#06b6d4',
+                    border: `1px solid ${currentData.isOnline === true ? '#10b981' : '#ef4444'}`,
+                    color: currentData.isOnline === true ? '#10b981' : '#ef4444',
                     padding: '0.4rem 0.8rem',
                     borderRadius: '6px',
                     fontSize: '0.78rem',
@@ -2331,8 +2331,11 @@ export default function App() {
                     alignItems: 'center',
                     gap: '0.4rem'
                   }}>
-                    <span style={{ backgroundColor: selectedVehicle ? '#10b981' : '#ef4444', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block' }}></span>
-                    📡 Active Hardware Tracker: {selectedVehicle ? `${selectedVehicle.name} (${selectedVehicle.id})` : 'None Registered'}
+                    <span style={{ backgroundColor: currentData.isOnline === true ? '#10b981' : '#ef4444', width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', animation: currentData.isOnline === true ? 'pulse 1.5s infinite' : 'none' }}></span>
+                    {currentData.isOnline === true
+                      ? `📡 LIVE: ${selectedVehicle?.name || 'Device'} (${selectedVehicleId})`
+                      : `🔴 OFFLINE: ${selectedVehicle?.name || 'Device'} — No MQTT Signal`
+                    }
                   </div>
                   <div ref={trackingMapRef} style={{ height: '540px', minHeight: '540px', width: '100%', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
@@ -2342,7 +2345,9 @@ export default function App() {
 
                 <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Interactive Map</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>Active (Leaflet OSM)</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: currentData.isOnline === true ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                    {currentData.isOnline === true ? '🟢 Live (Leaflet OSM)' : '🔴 Offline Mode'}
+                  </span>
                 </div>
 
                   <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
