@@ -2344,8 +2344,8 @@ export default function App() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '1.25rem', height: '540px' }}>
-                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px', minHeight: '540px', position: 'relative' }}>
+              <div className="responsive-two-col-grid">
+                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', minHeight: '380px', position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
                     top: '12px',
@@ -2641,8 +2641,8 @@ export default function App() {
 
           {/* STOPPAGE AND DWELL TIME ANALYTICS TAB */}
           {activeTab === 'stoppages' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '1.25rem', height: '540px' }}>
-              <div className="panel-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', height: '540px' }}>
+            <div className="responsive-two-col-grid">
+              <div className="panel-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="panel-title" style={{ color: '#ef4444', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Compass size={16} /> Stoppage &amp; Dwell List
@@ -2698,7 +2698,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px' }}>
+              <div className="panel-container" style={{ padding: 0, overflow: 'hidden', minHeight: '380px' }}>
                 <StoppageMap stoppages={stoppageList} historyPoints={historyTrail} selectedVehicle={selectedVehicle} />
               </div>
             </div>
@@ -2706,7 +2706,7 @@ export default function App() {
 
           {/* ENGINE TAB */}
           {activeTab === 'engine' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr', gap: '1.25rem', height: '480px' }}>
+            <div className="responsive-two-col-grid">
               <div className="panel-container">
                 <span className="panel-title">Engine Charts</span>
                 <div className="chart-box">
@@ -3035,7 +3035,7 @@ export default function App() {
           {/* FUEL MONITORING TAB */}
           {activeTab === 'fuel' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem', height: '360px' }}>
+              <div className="responsive-three-col-grid">
                 <div className="panel-container">
                   <span className="panel-title">Fuel Level Chart</span>
                   <div className="chart-box" style={{ height: '270px' }}>
@@ -3059,7 +3059,7 @@ export default function App() {
               </div>
 
               {/* SRS 3.3 live fuel parameters row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+              <div className="responsive-four-col-grid">
                 <div className="panel-container" style={{ padding: '0.85rem' }}>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fuel Level</span>
                   <span style={{ fontSize: '1.4rem', fontWeight: 700, color: currentData.fuelLevel < 15 ? 'var(--accent-red)' : 'var(--text-primary)', fontFamily: 'var(--font-mono)', display: 'block', marginTop: '0.25rem' }}>
@@ -3097,7 +3097,7 @@ export default function App() {
 
           {/* BACKUP BATTERY STATUS TAB */}
           {activeTab === 'battery' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr', gap: '1.25rem', height: '490px' }}>
+            <div className="responsive-two-col-grid">
               
               {/* Left Panel: Shock Telemetry and G-Force */}
               <div className="panel-container">
@@ -3178,7 +3178,7 @@ export default function App() {
 
           {/* DAILY RUNNING SUMMARY TAB */}
           {activeTab === 'summary' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', height: '480px' }}>
+            <div className="responsive-two-col-grid">
               <div className="panel-container">
                 <span className="panel-title">Per-Day Running KM chart</span>
                 <div className="chart-box">

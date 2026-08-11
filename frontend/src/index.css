@@ -633,14 +633,28 @@ body {
 
 .responsive-two-col-grid {
   display: grid;
-  grid-template-columns: 1.1fr 2.5fr;
+  grid-template-columns: 1fr 2fr;
   gap: 1.25rem;
-  min-height: 540px;
+  min-height: 480px;
+}
+
+.responsive-three-col-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.responsive-four-col-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 }
 
 /* Tablet & Smaller Desktop: ≤ 1024px */
 @media (max-width: 1024px) {
-  .responsive-two-col-grid {
+  .responsive-two-col-grid,
+  .responsive-three-col-grid,
+  .responsive-four-col-grid {
     grid-template-columns: 1fr !important;
     height: auto !important;
     min-height: auto !important;
