@@ -1211,7 +1211,7 @@ export default function App() {
       setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 250);
     }
 
-    // ═══ DASHBOARD HOME: ALL devices as fleet markers ═══
+    // ═══ DASHBOARD HOME: ALL devices on ONE single multi-vehicle map ═══
     if (activeTab === 'home' && mapInstanceRef.current) {
       if (mapInstanceRef.current._fleetMarkersGroup) {
         mapInstanceRef.current._fleetMarkersGroup.clearLayers();
@@ -1219,33 +1219,45 @@ export default function App() {
         mapInstanceRef.current._fleetMarkersGroup = L.layerGroup().addTo(mapInstanceRef.current);
       }
 
+      const devicesWithCoords = [];
+
       vehicles.forEach(v => {
-        const t = telemetry[v.id] || {};
+        const t = telemetry[v.id] || telemetry[v.topic] || Object.values(telemetry).find(x => x.vehicleId === v.id || x.topic === v.topic) || {};
         const isOnline = t.isOnline === true;
-        const hasCoords = t.lat != null && t.lng != null && typeof t.lat === 'number' && t.lat !== 0;
-        if (!hasCoords) return; // Skip — no real GPS coords from MQTT
+        const hasCoords = typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && t.lat !== 0;
+        if (!hasCoords) return; // Skip if no GPS coords
+
+        devicesWithCoords.push([t.lat, t.lng]);
 
         const color = isOnline ? '#10b981' : '#ef4444';
         const icon = L.divIcon({
-          html: `<div style="width:34px;height:34px;background:${color};border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 14px ${color};display:flex;align-items:center;justify-content:center;font-size:16px">${isOnline ? '🟢' : '🔴'}</div>`,
-          className: '', iconSize: [34, 34], iconAnchor: [17, 17]
+          html: `<div style="width:36px;height:36px;background:${color};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 16px ${color};display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:bold">${isOnline ? '🟢' : '🔴'}</div>`,
+          className: '', iconSize: [36, 36], iconAnchor: [18, 18]
         });
+
         const marker = L.marker([t.lat, t.lng], { icon })
           .addTo(mapInstanceRef.current._fleetMarkersGroup);
+
         marker.bindPopup(`
-          <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:170px">
-            <strong style="color:#0284c7;font-size:13px">📡 ${v.name}</strong><br/>
+          <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:180px">
+            <strong style="color:#0284c7;font-size:13px">📡 ${v.name} (${v.id})</strong><br/>
             <b>Status:</b> <span style="color:${color};font-weight:700">${isOnline ? '🟢 ONLINE / LIVE' : '🔴 OFFLINE'}</span><br/>
             <b>Speed:</b> ${t.speed || 0} km/h<br/>
-            <b>Location:</b> ${t.address || `${t.lat?.toFixed(5)}, ${t.lng?.toFixed(5)}`}
+            <b>Location:</b> ${t.address || `${t.lat.toFixed(5)}, ${t.lng.toFixed(5)}`}
           </div>`);
       });
 
-      // Auto-fit bounds to all online devices
-      if (onlineDevices.length > 1) {
-        const bounds = onlineDevices.map(v => telemetry[v.id]).filter(t => t?.lat != null).map(t => [t.lat, t.lng]);
-        if (bounds.length > 1) mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      // Auto-fit map bounds to frame ALL devices on the multi-vehicle map
+      if (devicesWithCoords.length > 1) {
+        mapInstanceRef.current.fitBounds(devicesWithCoords, { padding: [50, 50], maxZoom: 15 });
+      } else if (devicesWithCoords.length === 1) {
+        mapInstanceRef.current.setView(devicesWithCoords[0], 14);
       }
+
+      setTimeout(() => {
+        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+      }, 300);
+
       return;
     }
 
@@ -1971,14 +1983,14 @@ export default function App() {
               <div className="dashboard-main-row" style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '1.25rem' }}>
                 
                 {/* Multi-vehicle live tracking map */}
-                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '360px' }}>
+                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '380px', minHeight: '380px' }}>
                   <div className="panel-header" style={{ padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className="panel-title"><Map size={14} /> Multi-Vehicle Fleet Live Map</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
                       Showing {filteredVehicles.length} of {vehicles.length} vehicles {statusFilter !== 'all' ? `(Filter: ${statusFilter.toUpperCase()})` : ''}
                     </span>
                   </div>
-                  <div ref={dashboardMapRef} style={{ height: 'calc(100% - 37px)', width: '100%' }}></div>
+                  <div ref={dashboardMapRef} style={{ height: '343px', minHeight: '343px', width: '100%' }}></div>
                 </div>
 
                 {/* System alert feed */}
