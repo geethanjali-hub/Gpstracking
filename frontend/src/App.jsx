@@ -178,8 +178,8 @@ function NavRouteMap({ navData, vehicleData }) {
   }, [navData, vehicleData?.id]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '520px', borderRadius: '8px', overflow: 'hidden' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '520px', zIndex: 1 }} />
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '380px', borderRadius: '8px', overflow: 'hidden' }}>
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '380px', zIndex: 1 }} />
     </div>
   );
 }
@@ -2543,9 +2543,9 @@ export default function App() {
             </div>
           )}
 
-          {/* GOOGLE MAPS NAVIGATION AND ETA TAB */}
+          {/* GOOGLE MAPS NAVIGATION & REAL-TIME ETA TAB */}
           {activeTab === 'navigation' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '1.25rem', height: '540px' }}>
+            <div className="responsive-two-col-grid">
               <div className="panel-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 <span className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#06b6d4' }}>
                   <Navigation size={16} /> Destination Route Search
@@ -2599,7 +2599,7 @@ export default function App() {
                           setDestAddressInput(p.name);
                           calculateNavRoute(p.lat, p.lng, p.name);
                         }}
-                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid rgba(6,182,212,0.4)', backgroundColor: 'rgba(6,182,212,0.1)', color: '#06b6d4', cursor: 'pointer' }}
+                        style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', borderRadius: '4px', border: '1px solid rgba(6,182,212,0.4)', backgroundColor: 'rgba(6,182,212,0.1)', color: '#06b6d4', cursor: 'pointer' }}
                       >
                         📍 {String(p.name)}
                       </button>
@@ -2633,7 +2633,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '540px' }}>
+              <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '100%', minHeight: '380px' }}>
                 <NavRouteMap navData={navRouteData} vehicleData={currentData} />
               </div>
             </div>

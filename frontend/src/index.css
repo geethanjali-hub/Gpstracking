@@ -631,8 +631,20 @@ body {
    RESPONSIVE DESIGN & MOBILE OPTIMIZATIONS (ALL PAGES & TABS)
    ═══════════════════════════════════════════════════════════════════════════ */
 
+.responsive-two-col-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 2.5fr;
+  gap: 1.25rem;
+  min-height: 540px;
+}
+
 /* Tablet & Smaller Desktop: ≤ 1024px */
 @media (max-width: 1024px) {
+  .responsive-two-col-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
   .app-container {
     flex-direction: column;
     height: auto;
