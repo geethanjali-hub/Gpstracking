@@ -1173,7 +1173,7 @@ export default function App() {
     fetchCharts(selectedVehicleId);
   }, [selectedVehicleId]);
 
-  // Render & Update Leaflet Map synchronously without flickering or initialization errors
+  // Render & Update Leaflet Map — Dashboard Home = ALL devices, Tracking = single selected vehicle
   useEffect(() => {
     if (activeTab !== 'home' && activeTab !== 'tracking') return;
     const container = activeTab === 'home' ? dashboardMapRef.current : trackingMapRef.current;
@@ -1181,114 +1181,116 @@ export default function App() {
 
     const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
     const currentData = selectedVehicle ? (telemetry[selectedVehicleId] || {}) : {};
-    const hasValidCoords = !!selectedVehicle && currentData.lat != null && currentData.lng != null && currentData.isOnline !== false;
+    const hasValidCoords = !!selectedVehicle && currentData.lat != null && currentData.lng != null && currentData.isOnline === true;
     const mapInstanceRef = activeTab === 'home' ? dashboardMapInstance : trackingMapInstance;
     const markerRef = activeTab === 'home' ? dashboardMarkerInstance : trackingMarkerInstance;
-    const centerCoords = hasValidCoords
-      ? [currentData.lat, currentData.lng]
-      : (mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : [11.00659, 77.01404]);
 
-    // Initialize Leaflet Map if container changed or map is not active
+    // For home: centre on first online device, fallback to Coimbatore
+    const onlineDevices = vehicles.filter(v => telemetry[v.id]?.isOnline === true && telemetry[v.id]?.lat != null);
+    const firstOnline = onlineDevices[0] ? telemetry[onlineDevices[0].id] : null;
+    const centerCoords = activeTab === 'home'
+      ? (firstOnline ? [firstOnline.lat, firstOnline.lng] : [11.02366, 76.9424])
+      : (hasValidCoords ? [currentData.lat, currentData.lng]
+          : (mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : [11.00659, 77.01404]));
+
+    // Initialize map if not yet created or container changed
     if (!mapInstanceRef.current || mapInstanceRef.current._container !== container) {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
       markerRef.current = null;
       routeLineRef.current = null;
       geofenceCircleRef.current = null;
+      if (container._leaflet_id) delete container._leaflet_id;
 
-      if (container._leaflet_id) {
-        delete container._leaflet_id;
-      }
-
-      const map = L.map(container, { zoomControl: false }).setView(centerCoords, hasValidCoords ? 16 : 13);
+      const map = L.map(container, { zoomControl: false }).setView(centerCoords, activeTab === 'home' ? 13 : (hasValidCoords ? 16 : 13));
       mapInstanceRef.current = map;
-
-      // Google Maps Vector-Style Vector Tiles (CARTO Voyager Theme)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 20
+        subdomains: 'abcd', maxZoom: 20
       }).addTo(map);
-
       L.control.zoom({ position: 'topright' }).addTo(map);
-
-      setTimeout(() => {
-        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
-      }, 250);
+      setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 250);
     }
 
-    // Update marker and view smoothly without tearing or map flickering
+    // ═══ DASHBOARD HOME: ALL devices as fleet markers ═══
+    if (activeTab === 'home' && mapInstanceRef.current) {
+      if (mapInstanceRef.current._fleetMarkersGroup) {
+        mapInstanceRef.current._fleetMarkersGroup.clearLayers();
+      } else {
+        mapInstanceRef.current._fleetMarkersGroup = L.layerGroup().addTo(mapInstanceRef.current);
+      }
+
+      vehicles.forEach(v => {
+        const t = telemetry[v.id] || {};
+        const isOnline = t.isOnline === true;
+        const hasCoords = t.lat != null && t.lng != null && typeof t.lat === 'number' && t.lat !== 0;
+        if (!hasCoords) return; // Skip — no real GPS coords from MQTT
+
+        const color = isOnline ? '#10b981' : '#ef4444';
+        const icon = L.divIcon({
+          html: `<div style="width:34px;height:34px;background:${color};border:2.5px solid #fff;border-radius:50%;box-shadow:0 0 14px ${color};display:flex;align-items:center;justify-content:center;font-size:16px">${isOnline ? '🟢' : '🔴'}</div>`,
+          className: '', iconSize: [34, 34], iconAnchor: [17, 17]
+        });
+        const marker = L.marker([t.lat, t.lng], { icon })
+          .addTo(mapInstanceRef.current._fleetMarkersGroup);
+        marker.bindPopup(`
+          <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:170px">
+            <strong style="color:#0284c7;font-size:13px">📡 ${v.name}</strong><br/>
+            <b>Status:</b> <span style="color:${color};font-weight:700">${isOnline ? '🟢 ONLINE / LIVE' : '🔴 OFFLINE'}</span><br/>
+            <b>Speed:</b> ${t.speed || 0} km/h<br/>
+            <b>Location:</b> ${t.address || `${t.lat?.toFixed(5)}, ${t.lng?.toFixed(5)}`}
+          </div>`);
+      });
+
+      // Auto-fit bounds to all online devices
+      if (onlineDevices.length > 1) {
+        const bounds = onlineDevices.map(v => telemetry[v.id]).filter(t => t?.lat != null).map(t => [t.lat, t.lng]);
+        if (bounds.length > 1) mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+      return;
+    }
+
+    // ═══ LIVE TRACKING TAB: Single selected vehicle ═══
     if (activeTab === 'tracking' && mapInstanceRef.current) {
       if (hasValidCoords) {
         const currentCoords = [currentData.lat, currentData.lng];
         const heading = currentData.heading || 0;
         const markerColor = '#06b6d4';
         const markerSymbol = '🛰️';
-
-        const selectedVeh = vehicles.find(v => v.id === selectedVehicleId);
-        const vehNameDisplay = selectedVeh?.name || selectedVehicleId || 'GPS Tracker';
-
+        const vehNameDisplay = selectedVehicle?.name || selectedVehicleId || 'GPS Tracker';
         const popupContent = `
-          <div style="color: #0f172a; font-family: sans-serif; padding: 4px; font-size: 12px; min-width: 180px;">
-            <strong style="font-size: 13px; color: #0891b2;">${markerSymbol} ${vehNameDisplay}</strong><br/>
-            <strong>Status:</strong> <span style="color:#10b981; font-weight:bold;">🟢 Live GPS Stream</span><br/>
+          <div style="color:#0f172a;font-family:sans-serif;padding:4px;font-size:12px;min-width:180px">
+            <strong style="font-size:13px;color:#0891b2">${markerSymbol} ${vehNameDisplay}</strong><br/>
+            <strong>Status:</strong> <span style="color:#10b981;font-weight:bold">🟢 Live GPS Stream</span><br/>
             <strong>Lat:</strong> ${currentData.lat.toFixed(6)} | <strong>Lng:</strong> ${currentData.lng.toFixed(6)}
-          </div>
-        `;
-
+          </div>`;
 
         if (markerRef.current) {
-          // Update position smoothly without tile reset
           markerRef.current.setLatLng(currentCoords);
           markerRef.current.getPopup()?.setContent(popupContent);
-
           const iconEl = markerRef.current.getElement()?.querySelector('.map-veh-icon-inner');
-          if (iconEl) {
-            iconEl.style.transform = `rotate(${heading}deg)`;
-          }
+          if (iconEl) iconEl.style.transform = `rotate(${heading}deg)`;
         } else {
-          const iconHtml = `<div class="map-veh-icon-inner" style="
-            transform: rotate(${heading}deg);
-            width: 34px;
-            height: 34px;
-            background-color: ${markerColor};
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            box-shadow: 0 0 16px ${markerColor};
-            display:flex; align-items:center; justify-content:center;
-            font-size: 18px;
-            transition: transform 0.3s ease;
-          ">${markerSymbol}</div>`;
-
           const vehicleIcon = L.divIcon({
             className: 'map-veh-icon',
-            html: iconHtml,
-            iconSize: [34, 34],
-            iconAnchor: [17, 17]
+            html: `<div class="map-veh-icon-inner" style="transform:rotate(${heading}deg);width:34px;height:34px;background-color:${markerColor};border:2px solid #fff;border-radius:50%;box-shadow:0 0 16px ${markerColor};display:flex;align-items:center;justify-content:center;font-size:18px;transition:transform 0.3s ease">${markerSymbol}</div>`,
+            iconSize: [34, 34], iconAnchor: [17, 17]
           });
-
           markerRef.current = L.marker(currentCoords, { icon: vehicleIcon }).addTo(mapInstanceRef.current);
           markerRef.current.bindPopup(popupContent).openPopup();
           mapInstanceRef.current.setView(currentCoords, 16);
           prevCoordsRef.current = currentCoords;
         }
 
-        // Only pan map if position changed significantly (> ~10 meters) to avoid map tile flickering
         const prev = prevCoordsRef.current;
         if (!prev || Math.abs(prev[0] - currentCoords[0]) > 0.0001 || Math.abs(prev[1] - currentCoords[1]) > 0.0001) {
           mapInstanceRef.current.panTo(currentCoords, { animate: true, duration: 0.5 });
           prevCoordsRef.current = currentCoords;
         }
       } else {
-        if (markerRef.current) {
-          mapInstanceRef.current.removeLayer(markerRef.current);
-          markerRef.current = null;
-        }
+        if (markerRef.current) { mapInstanceRef.current.removeLayer(markerRef.current); markerRef.current = null; }
       }
     }
-  }, [activeTab, selectedVehicleId, telemetry]);
+  }, [activeTab, selectedVehicleId, telemetry, vehicles]);
 
   // Render Charts (Telemetry line history)
   useEffect(() => {
