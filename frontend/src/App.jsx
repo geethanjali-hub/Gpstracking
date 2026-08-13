@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Shield,
   Activity,
-  Map,
+  Map as MapIcon,
   Compass,
   AlertOctagon,
   FileText,
@@ -1986,7 +1986,7 @@ export default function App() {
             )}
             <li>
               <span className={`nav-link ${activeTab === 'tracking' ? 'active' : ''}`} onClick={() => { setActiveTab('tracking'); setMobileMenuOpen(false); }}>
-                <Map size={14} /> {role === 'viewer' ? 'My Live Tracking' : 'Live Tracking'}
+                <MapIcon size={14} /> {role === 'viewer' ? 'My Live Tracking' : 'Live Tracking'}
               </span>
             </li>
             <li>
@@ -2153,7 +2153,7 @@ export default function App() {
                 {/* Multi-vehicle live tracking map */}
                 <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '420px', minHeight: '420px', width: '100%' }}>
                   <div className="panel-header" style={{ padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="panel-title"><Map size={14} /> Multi-Vehicle Fleet Live Map</span>
+                    <span className="panel-title"><MapIcon size={14} /> Multi-Vehicle Fleet Live Map</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
                       Showing {filteredVehicles.length} of {vehicles.length} vehicles {statusFilter !== 'all' ? `(Filter: ${statusFilter.toUpperCase()})` : ''}
                     </span>
