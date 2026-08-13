@@ -287,7 +287,7 @@ function RouteHistoryMapComponent({ historyTrail, selectedVehicle }) {
     const container = mapContainerRef.current;
     if (container._leaflet_id) delete container._leaflet_id;
 
-    const validCoords = (historyTrail || []).filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number');
+    const validCoords = (historyTrail || []).filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number' && !isNaN(p.lat) && !isNaN(p.lng) && p.lat !== 0 && p.lng !== 0 && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
     const centerCoords = validCoords.length > 0
       ? [validCoords[0].lat, validCoords[0].lng]
       : [11.02366, 76.9424];
@@ -1917,7 +1917,7 @@ export default function App() {
           </div>
 
           <div className="topbar-actions">
-            {activeTab === 'tracking' && (
+            {(activeTab === 'tracking' || activeTab === 'history') && (
               <div className="topbar-device-select-box">
                 <span className="select-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📡 Select Device:</span>
                 <select
@@ -2457,8 +2457,28 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Date & Time Selectors Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', alignItems: 'end', backgroundColor: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                {/* Device & Date & Time Selectors Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', alignItems: 'end', backgroundColor: 'rgba(255,255,255,0.02)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', color: '#06b6d4', fontWeight: 800, display: 'block', marginBottom: '0.35rem' }}>
+                      📡 Select Target Device / Vehicle
+                    </label>
+                    <select
+                      value={selectedVehicleId}
+                      onChange={(e) => {
+                        setSelectedVehicleId(e.target.value);
+                        fetchRouteHistory(e.target.value);
+                      }}
+                      style={{ width: '100%', backgroundColor: '#0f172a', color: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '6px', padding: '0.45rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, outline: 'none', cursor: 'pointer' }}
+                    >
+                      {vehicles.map(v => (
+                        <option key={v.id} value={v.id}>
+                          📡 {v.name} ({v.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, display: 'block', marginBottom: '0.35rem' }}>
                       📅 Start DateTime (Year-&gt;Month-&gt;Date-&gt;Time)
