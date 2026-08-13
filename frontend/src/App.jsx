@@ -72,15 +72,17 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
 
     // Only add marker if we have REAL GPS coordinates from MQTT
     if (hasCoords) {
+      const isOnline = !isOff;
+      const color = isOnline ? '#10b981' : '#ef4444';
       const iconHtml = `<div style="
         width: 32px; height: 32px;
-        background: ${isOff ? '#ef4444' : '#0284c7'};
+        background: ${color};
         border: 2.5px solid white;
         border-radius: 50%;
-        box-shadow: 0 0 12px ${isOff ? 'rgba(239,68,68,0.7)' : 'rgba(2,132,199,0.7)'};
+        box-shadow: 0 0 12px ${color};
         display: flex; align-items: center; justify-content: center;
         font-size: 15px; color: white;
-      ">📡</div>`;
+      ">${isOnline ? '🟢' : '🔴'}</div>`;
 
       const customIcon = L.divIcon({
         html: iconHtml,
@@ -90,10 +92,15 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
       });
 
       const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+      
+      const addr = isOnline ? (telemetryData?.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`) : 'Offline';
+      marker.bindTooltip(`<b>${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'}: ${vehicle.name}</b><br/>📍 ${addr}`, { direction: 'top', offset: [0, -18], opacity: 0.95 });
+
       marker.bindPopup(`
         <div style="font-family: sans-serif; font-size: 12px; color: #0f172a; padding: 2px;">
-          <strong style="color: #0284c7;">${vehicle.name}</strong><br/>
-          <b>Status:</b> ${isOff ? '🔴 Offline' : '🟢 Live GPS'}<br/>
+          <strong style="color: ${color};">${vehicle.name}</strong><br/>
+          <b>Status:</b> ${isOnline ? '🟢 Live GPS' : '🔴 Offline'}<br/>
+          <b>Address:</b> ${addr}<br/>
           <b>Speed:</b> ${telemetryData?.speed || 0} km/h
         </div>
       `);
@@ -1412,11 +1419,11 @@ export default function App() {
 
       vehicles.forEach((v, idx) => {
         const t = telemetry[v.id] || telemetry[v.topic] || Object.values(telemetry).find(x => x.vehicleId === v.id || x.topic === v.topic) || {};
-        const isOnline = t.isOnline === true;
+        const isOnline = t.isOnline === true && typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && t.lat !== 0;
         
         let lat = t.lat;
         let lng = t.lng;
-        if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || lat === 0) {
+        if (!isOnline) {
           const fb = fallbackCoords[idx % fallbackCoords.length];
           lat = fb[0];
           lng = fb[1];
@@ -1431,7 +1438,7 @@ export default function App() {
               <div style="background:#0f172a;color:#ffffff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:800;border:1.5px solid ${color};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);margin-bottom:2px;">
                 📡 ${v.name} (${v.id})
               </div>
-              <div style="width:32px;height:32px;background:${color};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 12px ${color};display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:bold">
+              <div style="width:32px;height:32px;background:${color};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 12px ${color};display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:bold;animation:${isOnline ? 'pulse 1.5s infinite' : 'none'};">
                 ${isOnline ? '🟢' : '🔴'}
               </div>
             </div>`,
@@ -1441,12 +1448,25 @@ export default function App() {
         const marker = L.marker([lat, lng], { icon })
           .addTo(mapInstanceRef.current._fleetMarkersGroup);
 
+        const addrText = isOnline
+          ? (t.address || currentAddress[v.id] || `${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+          : 'Location Unavailable (Device Offline / Power OFF)';
+
+        const tooltipHtml = `
+          <div style="font-family:sans-serif;font-size:11px;padding:3px 5px;color:#0f172a;max-width:240px">
+            <strong style="color:${color};display:block;margin-bottom:2px;">${isOnline ? '🟢 ONLINE' : '🔴 OFFLINE'} — ${v.name} (${v.id})</strong>
+            <b>📍 Address:</b> ${addrText}<br/>
+            <b>⚡ Speed:</b> ${isOnline ? (t.speed || 0) : 0} km/h
+          </div>`;
+
+        marker.bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -28], opacity: 0.95 });
+
         marker.bindPopup(`
           <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:180px">
             <strong style="color:#0284c7;font-size:13px">📡 ${v.name} (${v.id})</strong><br/>
-            <b>Status:</b> <span style="color:${color};font-weight:700">${isOnline ? '🟢 ONLINE / LIVE' : '🔴 OFFLINE'}</span><br/>
+            <b>Status:</b> <span style="color:${color};font-weight:700">${isOnline ? '🟢 ONLINE / LIVE' : '🔴 POWERED OFF / OFFLINE'}</span><br/>
             <b>Speed:</b> ${isOnline ? (t.speed || 0) : 0} km/h<br/>
-            <b>Location:</b> ${isOnline ? (t.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`) : 'Offline Standby Location'}
+            <b>📍 Address:</b> ${addrText}
           </div>`);
       });
 
