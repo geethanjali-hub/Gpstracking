@@ -122,6 +122,32 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
   return (
     <div style={{ position: 'relative', width: '100%', height: '190px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)', margin: '0.65rem 0' }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
+      <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
+        <button
+          type="button"
+          onClick={() => {
+            if (mapInstanceRef.current && hasCoords) {
+              mapInstanceRef.current.setView([lat, lng], 16);
+            }
+          }}
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            color: '#06b6d4',
+            border: '1.5px solid #06b6d4',
+            padding: '3px 8px',
+            borderRadius: '5px',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
+          🎯 Locate
+        </button>
+      </div>
       <div style={{ position: 'absolute', bottom: '8px', left: '8px', zIndex: 10, background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(4px)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.68rem', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.12)' }}>
         📍 {hasCoords ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Location Offline'}
       </div>
@@ -1236,8 +1262,16 @@ export default function App() {
 
         const color = isOnline ? '#10b981' : '#ef4444';
         const icon = L.divIcon({
-          html: `<div style="width:36px;height:36px;background:${color};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 16px ${color};display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:bold">${isOnline ? '🟢' : '🔴'}</div>`,
-          className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+          html: `
+            <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
+              <div style="background:#0f172a;color:#ffffff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:800;border:1.5px solid ${color};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);margin-bottom:2px;">
+                📡 ${v.name}
+              </div>
+              <div style="width:32px;height:32px;background:${color};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 12px ${color};display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:bold">
+                ${isOnline ? '🟢' : '🔴'}
+              </div>
+            </div>`,
+          className: '', iconSize: [90, 56], iconAnchor: [45, 48]
         });
 
         const marker = L.marker([t.lat, t.lng], { icon })
@@ -1724,38 +1758,6 @@ export default function App() {
                 <LayoutGrid size={14} style={{ color: 'var(--accent-cyan)' }} /> Fleet Gallery Grid
               </span>
             </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
-                <Clock size={14} style={{ color: '#8b5cf6' }} /> Route History Replay
-              </span>
-            </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'navigation' ? 'active' : ''}`} onClick={() => { setActiveTab('navigation'); setMobileMenuOpen(false); }}>
-                <Navigation size={14} style={{ color: '#06b6d4' }} /> Google Maps Nav &amp; ETA
-              </span>
-            </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'stoppages' ? 'active' : ''}`} onClick={() => { setActiveTab('stoppages'); setMobileMenuOpen(false); if (selectedVehicleId) fetchStoppageAnalytics(selectedVehicleId); }}>
-                <Compass size={14} style={{ color: '#ef4444' }} /> Stoppage Analytics
-              </span>
-            </li>
-            <li>
-              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                <Battery size={14} /> Backup Battery Status
-              </span>
-            </li>
-            <li>
-              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                <FileText size={14} /> Daily Running Summary
-              </span>
-            </li>
-            {role !== 'viewer' && (
-              <li>
-                <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                  <FileText size={14} style={{ color: 'var(--accent-cyan)' }} /> Telematics Reports
-                </span>
-              </li>
-            )}
             {role === 'admin' && (
               <li>
                 <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}>
@@ -1812,20 +1814,22 @@ export default function App() {
           </div>
 
           <div className="topbar-actions">
-            <div className="topbar-device-select-box">
-              <span className="select-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📡 Select Device:</span>
-              <select
-                value={selectedVehicleId}
-                onChange={(e) => setSelectedVehicleId(e.target.value)}
-                className="topbar-select"
-              >
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>
-                    📡 {v.name} ({v.id})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {activeTab === 'tracking' && (
+              <div className="topbar-device-select-box">
+                <span className="select-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📡 Select Device:</span>
+                <select
+                  value={selectedVehicleId}
+                  onChange={(e) => setSelectedVehicleId(e.target.value)}
+                  className="topbar-select"
+                >
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>
+                      📡 {v.name} ({v.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <span className={`role-badge ${role}`}>{role.toUpperCase()} PROFILE</span>
           </div>
         </header>
@@ -1848,7 +1852,7 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
               {/* SECTION A: FLEET-WIDE EXECUTIVE SUMMARY CARDS (Clickable Filters) */}
-              <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
+              <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem' }}>
                 
                 <div
                   onClick={() => setStatusFilter('all')}
@@ -1887,44 +1891,6 @@ export default function App() {
                 </div>
 
                 <div
-                  onClick={() => setStatusFilter('good')}
-                  className="metric-ring-card"
-                  style={{
-                    borderLeft: '4px solid #10b981',
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === 'good' ? '0 0 12px rgba(16, 185, 129, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'good' ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-card)'
-                  }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Performing Well</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: '#10b981' }}>
-                      {vehicles.filter(v => getPerformance(v.id).rating === 'Good').length}
-                    </span>
-                    <span className="metric-card-desc">Click to filter good</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setStatusFilter('poor')}
-                  className="metric-ring-card"
-                  style={{
-                    borderLeft: '4px solid #ef4444',
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === 'poor' ? '0 0 12px rgba(239, 68, 68, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'poor' ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-card)'
-                  }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Non-Performing</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: '#ef4444' }}>
-                      {vehicles.filter(v => getPerformance(v.id).rating === 'Poor').length}
-                    </span>
-                    <span className="metric-card-desc">Click to filter faults</span>
-                  </div>
-                </div>
-
-                <div
                   onClick={() => setStatusFilter('idle')}
                   className="metric-ring-card"
                   style={{
@@ -1943,95 +1909,20 @@ export default function App() {
                   </div>
                 </div>
 
-                <div
-                  onClick={() => setStatusFilter('low_fuel')}
-                  className="metric-ring-card"
-                  style={{
-                    borderLeft: '4px solid var(--accent-red)',
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === 'low_fuel' ? '0 0 12px rgba(239, 68, 68, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'low_fuel' ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-card)'
-                  }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Low Fuel</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: 'var(--accent-red)' }}>
-                      {vehicles.filter(v => (telemetry[v.id]?.fuelLevel || 0) < 15).length}
-                    </span>
-                    <span className="metric-card-desc">Click to filter low fuel</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setStatusFilter('all')}
-                  className="metric-ring-card"
-                  style={{ borderLeft: '4px solid var(--accent-orange)' }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Active Alerts</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: 'var(--accent-orange)' }}>
-                      {alerts.length}
-                    </span>
-                    <span className="metric-card-desc">Logged System Events</span>
-                  </div>
-                </div>
-
               </div>
 
-              {/* SECTION B: MULTI-VEHICLE LIVE MAP & SYSTEM ALERTS */}
-              <div className="dashboard-main-row" style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '1.25rem' }}>
+              {/* SECTION B: MULTI-VEHICLE LIVE MAP (Full Width) */}
+              <div className="dashboard-main-row" style={{ display: 'block', width: '100%' }}>
                 
                 {/* Multi-vehicle live tracking map */}
-                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '380px', minHeight: '380px' }}>
+                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '420px', minHeight: '420px', width: '100%' }}>
                   <div className="panel-header" style={{ padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className="panel-title"><Map size={14} /> Multi-Vehicle Fleet Live Map</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
                       Showing {filteredVehicles.length} of {vehicles.length} vehicles {statusFilter !== 'all' ? `(Filter: ${statusFilter.toUpperCase()})` : ''}
                     </span>
                   </div>
-                  <div ref={dashboardMapRef} style={{ height: '343px', minHeight: '343px', width: '100%' }}></div>
-                </div>
-
-                {/* System alert feed */}
-                <div className="panel-container" style={{ height: '360px', display: 'flex', flexDirection: 'column' }}>
-                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="panel-title"><Bell size={14} style={{ color: '#ef4444' }} /> Fleet Live Alerts</span>
-                    {alerts.length > 0 && (
-                      <span style={{ backgroundColor: '#ef4444', color: '#fff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
-                        {alerts.length} New
-                      </span>
-                    )}
-                  </div>
-                  <div className="log-list" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '4px' }}>
-                    {alerts.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        ✅ No system alerts recorded. All vehicles operational.
-                      </div>
-                    ) : (
-                      alerts.map(log => (
-                        <div key={log.id} style={{
-                          padding: '0.65rem 0.75rem',
-                          borderRadius: '6px',
-                          background: log.type === 'STATIONARY_1HR' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(2, 132, 199, 0.06)',
-                          borderLeft: log.type === 'STATIONARY_1HR' ? '4px solid #ef4444' : '4px solid #0284c7',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                            <strong style={{ color: log.type === 'STATIONARY_1HR' ? '#ef4444' : '#0284c7', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <AlertTriangle size={12} /> {log.title || log.type}
-                            </strong>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
-                          </div>
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', margin: 0 }}>{log.message}</p>
-                          {log.address && (
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                              📍 {log.address}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <div ref={dashboardMapRef} style={{ height: '380px', minHeight: '380px', width: '100%' }}></div>
                 </div>
 
               </div>
@@ -2096,46 +1987,6 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div style={{ display: 'flex', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
-                      {['today', 'yesterday', 'week', 'month', 'custom'].map((mode) => (
-                        <button
-                          key={mode}
-                          onClick={() => setDateFilterMode(mode)}
-                          style={{
-                            padding: '0.35rem 0.65rem',
-                            fontSize: '0.72rem',
-                            borderRadius: '4px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: dateFilterMode === mode ? 'var(--accent-cyan)' : 'transparent',
-                            color: dateFilterMode === mode ? '#000' : 'var(--text-secondary)',
-                            fontWeight: dateFilterMode === mode ? 700 : 500,
-                            textTransform: 'capitalize'
-                          }}
-                        >
-                          {mode === 'today' ? 'Today' : mode === 'yesterday' ? 'Yesterday' : mode === 'week' ? 'This Week' : mode === 'month' ? 'This Month' : 'Custom Range'}
-                        </button>
-                      ))}
-                    </div>
-
-                    {dateFilterMode === 'custom' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <input
-                          type="date"
-                          value={fromDate}
-                          onChange={(e) => setFromDate(e.target.value)}
-                          style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem' }}
-                        />
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>to</span>
-                        <input
-                          type="date"
-                          value={toDate}
-                          onChange={(e) => setToDate(e.target.value)}
-                          style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem' }}
-                        />
-                      </div>
-                    )}
-
                     {statusFilter !== 'all' && (
                       <button
                         onClick={() => setStatusFilter('all')}
@@ -2156,7 +2007,6 @@ export default function App() {
                           <th style={{ padding: '0.6rem 0.75rem' }}>Tracker ID</th>
                           <th style={{ padding: '0.6rem 0.75rem' }}>Tracker Name</th>
                           <th style={{ padding: '0.6rem 0.75rem' }}>User Name</th>
-                          <th style={{ padding: '0.6rem 0.75rem' }}>MQTT Topic</th>
                           <th style={{ padding: '0.6rem 0.75rem' }}>Current Location</th>
                           <th style={{ padding: '0.6rem 0.75rem' }}>Status</th>
                           <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Action</th>
@@ -2194,9 +2044,6 @@ export default function App() {
                                 </td>
                                 <td style={{ padding: '0.65rem 0.75rem', color: 'var(--accent-green)', fontWeight: 600 }}>
                                   👤 {v.userName || mappedUser?.name || 'System Admin'}
-                                </td>
-                                <td style={{ padding: '0.65rem 0.75rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#38bdf8' }}>
-                                  {v.topic || `sedhupathi/${v.id}/data`}
                                 </td>
                                 <td style={{ padding: '0.65rem 0.75rem', color: isLive ? 'var(--text-primary)' : 'var(--accent-red)', fontWeight: isLive ? 500 : 600 }}>
                                   📍 {toAddr}
@@ -2368,96 +2215,109 @@ export default function App() {
                       : `🔴 OFFLINE: ${selectedVehicle?.name || 'Device'} — No MQTT Signal`
                     }
                   </div>
-                  <div ref={trackingMapRef} style={{ width: '100%', height: '100%', minHeight: '340px', borderRadius: '6px', zIndex: 1 }}></div>
-                </div>
-                <div className="panel-container">
-                  <span className="panel-title"><Compass size={14} /> 📡 {selectedVehicle ? selectedVehicle.name : 'Device'} Details</span>
-                  <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Interactive Map</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: currentData.isOnline === true ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                    {currentData.isOnline === true ? '🟢 Live (Leaflet OSM)' : '🔴 Offline Mode'}
-                  </span>
-                </div>
-
-                  <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Hardware Device Status</span>
-                    <strong style={{ fontSize: '0.72rem', color: (currentData.isOnline !== true || !currentData.lat) ? 'var(--accent-red)' : currentData.fix ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
-                      {(currentData.isOnline !== true || !currentData.lat) ? '🔴 POWERED OFF / OFFLINE' : currentData.fix ? '🟢 ONLINE / LIVE GPS FIX' : '🟡 ONLINE / INDOOR STANDBY'}
-                    </strong>
+                  {/* Locate Vehicle button on map canvas */}
+                  <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 1000 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (trackingMapInstance.current && currentData.lat && currentData.lng) {
+                          trackingMapInstance.current.setView([currentData.lat, currentData.lng], 17);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#0f172a',
+                        color: '#06b6d4',
+                        border: '2px solid #06b6d4',
+                        padding: '0.45rem 0.85rem',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      🎯 Locate Vehicle
+                    </button>
                   </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Direction Arrow</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.heading || 0}° Heading</span>
+                  <div ref={trackingMapRef} style={{ width: '100%', height: '100%', minHeight: '340px', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>GPS Accuracy</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>±{currentData.accuracy || 2.5} m</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Altitude</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.altitude || 0} m</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Trip Distance</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.tripDistance ? currentData.tripDistance.toFixed(1) : '0.0'} km</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Per-Day Running KM</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-green)' }}>{currentData.todayRunningKm ? currentData.todayRunningKm.toFixed(2) : '0.00'} km</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.isOnline === true && currentData.lat ? 'Live Hardware Stream' : 'Offline'}</span>
-                </div>
-
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.street || currentStreet[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
+                {/* Google Maps Style Route History & Live Details Panel */}
+                <div className="panel-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <span className="panel-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#0284c7' }}>
+                    <span><Clock size={16} /> 🗺️ Route History (Google Maps Style)</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Year-&gt;Month-&gt;Date-&gt;Time</span>
                   </span>
-                </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.area || currentArea[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
-                  </span>
-                </div>
+                  {/* Date & Time Selector Pickers */}
+                  <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Start DateTime (Year-&gt;Month-&gt;Date-&gt;Time)</label>
+                      <input
+                        type="datetime-local"
+                        value={historyStartDateTime || `${fromDate}T00:00`}
+                        onChange={(e) => setHistoryStartDateTime(e.target.value)}
+                        style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0.4rem', fontSize: '0.75rem' }}
+                      />
+                    </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address &amp; PIN</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                    {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.address || currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
-                  </span>
-                </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>End DateTime (Year-&gt;Month-&gt;Date-&gt;Time)</label>
+                      <input
+                        type="datetime-local"
+                        value={historyEndDateTime || `${toDate}T23:59`}
+                        onChange={(e) => setHistoryEndDateTime(e.target.value)}
+                        style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '0.4rem', fontSize: '0.75rem' }}
+                      />
+                    </div>
 
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedVehicleId) fetchRouteHistory(selectedVehicleId);
+                        }}
+                        className="action-btn"
+                        style={{ flex: 1, padding: '0.45rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', backgroundColor: '#0284c7', color: '#fff' }}
+                      >
+                        ▶️ Play Route Path
+                      </button>
+                    </div>
+                  </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Assigned Fixed Route Overlay</span>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>Configured</span>
-                </div>
+                  {/* Hardware Telemetry Parameters */}
+                  <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.35rem' }}>
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', borderBottom: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Hardware Device Status</span>
+                      <strong style={{ fontSize: '0.72rem', color: currentData.isOnline === true ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                        {currentData.isOnline === true ? '🟢 ONLINE / LIVE' : '🔴 POWERED OFF / OFFLINE'}
+                      </strong>
+                    </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route Deviation Indicator</span>
-                  <strong style={{ fontSize: '0.72rem', color: currentData.isDeviated ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                    {currentData.routeDeviationMeters} m {currentData.isDeviated ? '(DEVIATED)' : '(OK)'}
-                  </strong>
-                </div>
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', borderBottom: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Direction Heading</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.heading || 0}° Heading</span>
+                    </div>
 
-                <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Geofence Zone Boundaries</span>
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', borderBottom: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Today Distance</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent-green)' }}>{currentData.todayRunningKm ? currentData.todayRunningKm.toFixed(2) : '0.00'} km</span>
+                    </div>
+
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Address</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
+                        {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.address || currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
           </div>
           )}
 
@@ -2498,24 +2358,8 @@ export default function App() {
                       {/* Interactive Mini-Map Component for each vehicle card */}
                       <FleetCardMiniMap vehicle={v} telemetryData={tData} />
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)', boxSizing: 'border-box', width: '100%' }}>
-                        <div>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Device Speed</span>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: isOff ? 'var(--text-muted)' : 'var(--accent-cyan)' }}>
-                            {isOff ? '0 km/h' : `${tData.speed || 0} km/h`}
-                          </div>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Backup Battery</span>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#10b981' }}>
-                            {tData.backupBatteryPercent || 100}%
-                          </div>
-                        </div>
-                      </div>
-
                       <div style={{ fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', color: 'var(--text-secondary)' }}>
                         <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
-                        <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
                         <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
                       </div>
 
@@ -3346,7 +3190,7 @@ export default function App() {
                       </div>
                       <div className="form-group">
                         <label>Tracker ID / Device ID</label>
-                        <input type="text" className="form-input" placeholder="e.g. gps-obd-tracker-02" value={newDeviceId} onChange={e => setNewDeviceId(e.target.value)} required />
+                        <input type="text" className="form-input" placeholder="Add numbers like 1.2.3" value={newDeviceId} onChange={e => setNewDeviceId(e.target.value)} required />
                       </div>
                       <div className="form-group">
                         <label>Tracker Name / Alias</label>
@@ -3354,7 +3198,7 @@ export default function App() {
                       </div>
                       <div className="form-group">
                         <label>MQTT Topic Name</label>
-                        <input type="text" className="form-input" placeholder="e.g. sedhupathi/gps-obd-tracker-02/data" value={newDeviceTopic} onChange={e => setNewDeviceTopic(e.target.value)} required />
+                        <input type="text" className="form-input" placeholder="e.g. ibots/tracker/2/location" value={newDeviceTopic} onChange={e => setNewDeviceTopic(e.target.value)} required />
                       </div>
                       <div className="form-group">
                         <label>MQTT Broker Host / Name</label>
