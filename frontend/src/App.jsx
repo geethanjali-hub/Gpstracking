@@ -1401,43 +1401,58 @@ export default function App() {
 
       const devicesWithCoords = [];
 
-      vehicles.forEach(v => {
+      // Distinct fallback locations around Coimbatore so offline devices display clearly
+      const fallbackCoords = [
+        [11.0168, 76.9558], // Coimbatore North / Gandhipuram
+        [11.0284, 77.0270], // TIDEL Park / Hope College
+        [10.9980, 76.9637], // Railway Station / Town Hall
+        [11.0300, 77.0434], // Coimbatore Airport / KMCH
+        [11.0000, 76.9500]  // Perur / Ukkadam
+      ];
+
+      vehicles.forEach((v, idx) => {
         const t = telemetry[v.id] || telemetry[v.topic] || Object.values(telemetry).find(x => x.vehicleId === v.id || x.topic === v.topic) || {};
         const isOnline = t.isOnline === true;
-        const hasCoords = typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && t.lat !== 0;
-        if (!hasCoords) return; // Skip if no GPS coords
+        
+        let lat = t.lat;
+        let lng = t.lng;
+        if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || lat === 0) {
+          const fb = fallbackCoords[idx % fallbackCoords.length];
+          lat = fb[0];
+          lng = fb[1];
+        }
 
-        devicesWithCoords.push([t.lat, t.lng]);
+        devicesWithCoords.push([lat, lng]);
 
         const color = isOnline ? '#10b981' : '#ef4444';
         const icon = L.divIcon({
           html: `
             <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
               <div style="background:#0f172a;color:#ffffff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:800;border:1.5px solid ${color};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);margin-bottom:2px;">
-                📡 ${v.name}
+                📡 ${v.name} (${v.id})
               </div>
               <div style="width:32px;height:32px;background:${color};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 12px ${color};display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:bold">
                 ${isOnline ? '🟢' : '🔴'}
               </div>
             </div>`,
-          className: '', iconSize: [90, 56], iconAnchor: [45, 48]
+          className: '', iconSize: [100, 58], iconAnchor: [50, 50]
         });
 
-        const marker = L.marker([t.lat, t.lng], { icon })
+        const marker = L.marker([lat, lng], { icon })
           .addTo(mapInstanceRef.current._fleetMarkersGroup);
 
         marker.bindPopup(`
           <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:180px">
             <strong style="color:#0284c7;font-size:13px">📡 ${v.name} (${v.id})</strong><br/>
             <b>Status:</b> <span style="color:${color};font-weight:700">${isOnline ? '🟢 ONLINE / LIVE' : '🔴 OFFLINE'}</span><br/>
-            <b>Speed:</b> ${t.speed || 0} km/h<br/>
-            <b>Location:</b> ${t.address || `${t.lat.toFixed(5)}, ${t.lng.toFixed(5)}`}
+            <b>Speed:</b> ${isOnline ? (t.speed || 0) : 0} km/h<br/>
+            <b>Location:</b> ${isOnline ? (t.address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`) : 'Offline Standby Location'}
           </div>`);
       });
 
       // Auto-fit map bounds to frame ALL devices on the multi-vehicle map
       if (devicesWithCoords.length > 1) {
-        mapInstanceRef.current.fitBounds(devicesWithCoords, { padding: [50, 50], maxZoom: 15 });
+        mapInstanceRef.current.fitBounds(L.latLngBounds(devicesWithCoords), { padding: [50, 50], maxZoom: 15 });
       } else if (devicesWithCoords.length === 1) {
         mapInstanceRef.current.setView(devicesWithCoords[0], 14);
       }
