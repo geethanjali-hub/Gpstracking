@@ -336,6 +336,13 @@ function RouteHistoryMapComponent({ historyTrail, selectedVehicle }) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '380px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+      {/* Map Legend Overlay */}
+      <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 1000, backgroundColor: 'rgba(15, 23, 42, 0.88)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.15)', padding: '0.4rem 0.75rem', borderRadius: '6px', fontSize: '0.72rem', color: '#f8fafc', display: 'flex', gap: '0.85rem', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><span style={{ color: '#10b981', fontWeight: 800 }}>🟢</span> Start Point</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><span style={{ color: '#ef4444', fontWeight: 800 }}>🏁</span> End Point</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><span style={{ color: '#8b5cf6', fontWeight: 900 }}>━━</span> Travel Path Trajectory</span>
+      </div>
+
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
       {(!historyTrail || historyTrail.length === 0) && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(3px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
