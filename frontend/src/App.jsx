@@ -2149,16 +2149,16 @@ export default function App() {
 
                 {/* Fleet Vehicles View: List View vs Grid View */}
                 {fleetViewMode === 'list' ? (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
+                  <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid var(--border-color)', borderRadius: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                    <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.05em' }}>
-                          <th style={{ padding: '0.6rem 0.75rem' }}>Tracker ID</th>
-                          <th style={{ padding: '0.6rem 0.75rem' }}>Tracker Name</th>
-                          <th style={{ padding: '0.6rem 0.75rem' }}>User Name</th>
-                          <th style={{ padding: '0.6rem 0.75rem' }}>Current Location</th>
-                          <th style={{ padding: '0.6rem 0.75rem' }}>Status</th>
-                          <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Action</th>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.05em' }}>
+                          <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Tracker ID</th>
+                          <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Tracker Name</th>
+                          <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>User Name</th>
+                          <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Current Location</th>
+                          <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Status</th>
+                          <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Action</th>
                         </tr>
                       </thead>
                       <tbody>

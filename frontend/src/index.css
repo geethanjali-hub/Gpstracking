@@ -169,6 +169,9 @@ body {
 
 /* Header bar */
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
@@ -176,7 +179,7 @@ body {
   justify-content: space-between;
   padding: 0.65rem 1.25rem;
   margin-bottom: 0.75rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   flex-shrink: 0;
 }
 
@@ -866,6 +869,11 @@ body {
   }
 
   .topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1100 !important;
+    background: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 0.5rem !important;
