@@ -1506,10 +1506,17 @@ export default function App() {
       }
 
       // Auto-fit map bounds to frame ALL devices on the multi-vehicle map
-      if (devicesWithCoords.length > 1) {
-        mapInstanceRef.current.fitBounds(L.latLngBounds(devicesWithCoords), { padding: [50, 50], maxZoom: 15 });
-      } else if (devicesWithCoords.length === 1) {
-        mapInstanceRef.current.setView(devicesWithCoords[0], 14);
+      try {
+        if (devicesWithCoords.length > 1) {
+          const bounds = L.latLngBounds(devicesWithCoords);
+          if (bounds && typeof bounds.isValid === 'function' && bounds.isValid()) {
+            mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+          }
+        } else if (devicesWithCoords.length === 1 && Array.isArray(devicesWithCoords[0])) {
+          mapInstanceRef.current.setView(devicesWithCoords[0], 14);
+        }
+      } catch (boundsErr) {
+        console.warn("Map bounds fit error handled:", boundsErr);
       }
 
       setTimeout(() => {
