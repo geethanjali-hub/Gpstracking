@@ -1505,9 +1505,14 @@ export default function App() {
       // Auto-fit map bounds to frame ALL devices on the multi-vehicle map
       try {
         if (devicesWithCoords.length > 1) {
-          const bounds = L.latLngBounds(devicesWithCoords);
-          if (bounds && typeof bounds.isValid === 'function' && bounds.isValid()) {
-            mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+          const lats = devicesWithCoords.map(c => c[0]);
+          const lngs = devicesWithCoords.map(c => c[1]);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLng = Math.min(...lngs);
+          const maxLng = Math.max(...lngs);
+          if (!isNaN(minLat) && !isNaN(maxLat) && !isNaN(minLng) && !isNaN(maxLng)) {
+            mapInstanceRef.current.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [50, 50], maxZoom: 15 });
           }
         } else if (devicesWithCoords.length === 1 && Array.isArray(devicesWithCoords[0])) {
           mapInstanceRef.current.setView(devicesWithCoords[0], 14);
