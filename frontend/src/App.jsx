@@ -35,6 +35,14 @@ import {
 import Chart from 'chart.js/auto';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet Default Icon prototype _getIconUrl Vite minification bug (TypeError: Km is not a constructor)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 import { subscribeToTelemetry } from './firebase';
 import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getRefreshToken, refreshAccessToken, getUserProfile, authFetch, API_BASE } from './api';
 
@@ -60,7 +68,7 @@ function FleetCardMiniMap({ vehicle, telemetryData }) {
     const map = L.map(container, {
       zoomControl: false,
       attributionControl: false,
-      dragging: !L.Browser.mobile,
+      dragging: !('ontouchstart' in window),
       tap: false
     }).setView([lat, lng], hasCoords ? 15 : 11);
 
