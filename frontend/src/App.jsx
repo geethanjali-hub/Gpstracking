@@ -1785,30 +1785,23 @@ export default function App() {
       {/* Main Board view */}
       <main className="main-content">
         <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="topbar-main">
             <button
               type="button"
               className="mobile-hamburger-btn"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open Navigation Menu"
             >
-              <Menu size={20} style={{ color: '#000000', stroke: '#000000', strokeWidth: 2.5 }} />
+              <Menu size={18} style={{ color: '#000000', stroke: '#000000', strokeWidth: 2.5 }} />
               <span>MENU</span>
             </button>
 
             <h2 className="page-title">
               {activeTab === 'home' && 'Dashboard Home'}
-              {activeTab === 'tracking' && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-                  Live Tracking
-                  <span style={{ fontSize: '0.85rem', color: '#06b6d4', fontWeight: 700, backgroundColor: 'rgba(6, 182, 212, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(6, 182, 212, 0.4)' }}>
-                    {selectedVehicle ? `📡 ${selectedVehicle.name} (${selectedVehicle.id})` : '⚠️ No Device Selected'}
-                  </span>
-                </span>
-              )}
-              {activeTab === 'gallery' && 'Fleet Gallery Grid Overview'}
-              {activeTab === 'navigation' && 'Google Maps Navigation & Real-Time ETA'}
-              {activeTab === 'stoppages' && 'Stoppage & Dwell Time Analytics'}
+              {activeTab === 'tracking' && 'Live Tracking'}
+              {activeTab === 'gallery' && 'Fleet Gallery Overview'}
+              {activeTab === 'navigation' && 'Google Maps Nav & ETA'}
+              {activeTab === 'stoppages' && 'Stoppage Analytics'}
               {activeTab === 'engine' && 'Engine Health'}
               {activeTab === 'fuel' && 'Fuel Monitoring'}
               {activeTab === 'battery' && 'Backup Battery Status'}
@@ -1818,56 +1811,26 @@ export default function App() {
             </h2>
           </div>
 
-          <div className="topbar-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>📡 Select Device:</span>
+          <div className="topbar-actions">
+            <div className="topbar-device-select-box">
+              <span className="select-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📡 Select Device:</span>
               <select
                 value={selectedVehicleId}
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
-                style={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                  border: '1px solid #06b6d4',
-                  color: '#06b6d4',
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  outline: 'none',
-                  boxShadow: '0 0 8px rgba(6, 182, 212, 0.2)'
-                }}
+                className="topbar-select"
               >
                 {vehicles.map(v => (
-                  <option key={v.id} value={v.id} style={{ backgroundColor: '#0f172a', color: '#fff' }}>
+                  <option key={v.id} value={v.id}>
                     📡 {v.name} ({v.id})
                   </option>
                 ))}
               </select>
             </div>
-            <button
-              onClick={handleGoogleLogin}
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#fff',
-                padding: '0.35rem 0.65rem',
-                borderRadius: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}
-              title="Sign in with Google OAuth 2.0"
-            >
-              🌐 Google OAuth 2.0
-            </button>
             <span className={`role-badge ${role}`}>{role.toUpperCase()} PROFILE</span>
           </div>
         </header>
 
-        <div className="module-view" style={{ marginTop: '1.25rem' }}>
+        <div className="module-view">
           
           {/* Critical notification bar */}
           {alerts.filter(a => a.severity === 'critical').slice(0, 1).map(alert => (
@@ -2381,7 +2344,7 @@ export default function App() {
               )}
 
               <div className="responsive-two-col-grid">
-                <div className="panel-container responsive-map-container" style={{ padding: 0 }}>
+                <div className="panel-container tracking-map-card" style={{ padding: 0, overflow: 'hidden', height: '480px', minHeight: '340px', position: 'relative' }}>
                   <div style={{
                     position: 'absolute',
                     top: '12px',
@@ -2405,7 +2368,7 @@ export default function App() {
                       : `🔴 OFFLINE: ${selectedVehicle?.name || 'Device'} — No MQTT Signal`
                     }
                   </div>
-                  <div ref={trackingMapRef} style={{ width: '100%', height: '100%', minHeight: '100%', borderRadius: '6px', zIndex: 1 }}></div>
+                  <div ref={trackingMapRef} style={{ width: '100%', height: '100%', minHeight: '340px', borderRadius: '6px', zIndex: 1 }}></div>
                 </div>
                 <div className="panel-container">
                   <span className="panel-title"><Compass size={14} /> 📡 {selectedVehicle ? selectedVehicle.name : 'Device'} Details</span>
@@ -2522,7 +2485,7 @@ export default function App() {
                   const isOnline = tData.isOnline === true && tData.lat != null && typeof tData.lat === 'number' && tData.lat !== 0;
                   const isOff = !isOnline;
                   return (
-                    <div key={v.id} className="fleet-card" style={{ borderTop: `4px solid ${isOff ? '#ef4444' : '#0284c7'}` }}>
+                    <div key={v.id} className="fleet-card" style={{ borderTop: `4px solid ${isOff ? '#ef4444' : '#0284c7'}`, overflow: 'hidden', boxSizing: 'border-box', width: '100%' }}>
                       <div className="fleet-card-header">
                         <span className="fleet-card-title" style={{ fontSize: '1.1rem' }}>
                           📡 {v.name}
@@ -2535,7 +2498,7 @@ export default function App() {
                       {/* Interactive Mini-Map Component for each vehicle card */}
                       <FleetCardMiniMap vehicle={v} telemetryData={tData} />
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0', background: 'rgba(255,255,255,0.02)', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)', boxSizing: 'border-box', width: '100%' }}>
                         <div>
                           <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Device Speed</span>
                           <div style={{ fontSize: '0.95rem', fontWeight: 800, color: isOff ? 'var(--text-muted)' : 'var(--accent-cyan)' }}>
