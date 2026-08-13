@@ -2333,7 +2333,7 @@ export default function App() {
                     }
                   </div>
 
-                  {/* Locate Vehicle button on map canvas (bottom right corner) */}
+                  {/* Locate Vehicle button symbol only on map canvas (bottom right corner) */}
                   <div style={{ position: 'absolute', bottom: '26px', right: '12px', zIndex: 1000 }}>
                     <button
                       type="button"
@@ -2344,22 +2344,22 @@ export default function App() {
                         }
                       }}
                       style={{
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
                         color: '#06b6d4',
                         border: '2px solid #06b6d4',
-                        padding: '0.45rem 0.85rem',
-                        borderRadius: '24px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(0,0,0,0.6)',
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '50%',
+                        fontSize: '1.15rem',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.4rem',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.6)',
                         backdropFilter: 'blur(4px)'
                       }}
                     >
-                      🎯 Locate Vehicle
+                      🎯
                     </button>
                   </div>
 
