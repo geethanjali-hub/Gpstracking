@@ -1420,77 +1420,83 @@ export default function App() {
       // Used coordinate tracking to prevent overlapping markers on identical locations
       const positionMap = new Map();
 
-      vehicles.forEach((v, idx) => {
-        const t = telemetry[v.id] || telemetry[v.topic] || Object.values(telemetry).find(x => x.vehicleId === v.id || x.topic === v.topic) || {};
-        const isOnline = t.isOnline === true && typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && t.lat !== 0;
-        const isMoving = isOnline && (t.speed || 0) > 0;
-        
-        let rawLat = t.lat;
-        let rawLng = t.lng;
-        if (!isOnline) {
-          const fb = fallbackCoords[idx % fallbackCoords.length];
-          rawLat = fb[0];
-          rawLng = fb[1];
-        }
+      try {
+        vehicles.forEach((v, idx) => {
+          const t = telemetry[v.id] || telemetry[v.topic] || Object.values(telemetry).find(x => x.vehicleId === v.id || x.topic === v.topic) || {};
+          const hasValidCoords = typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && !isNaN(t.lng) && t.lat !== 0 && t.lng !== 0;
+          const isOnline = t.isOnline === true && hasValidCoords;
+          const numSpeed = typeof t.speed === 'number' ? t.speed : parseFloat(t.speed) || 0;
+          const isMoving = isOnline && numSpeed > 0;
+          
+          let rawLat = hasValidCoords ? t.lat : null;
+          let rawLng = hasValidCoords ? t.lng : null;
+          if (!isOnline || rawLat === null || rawLng === null) {
+            const fb = fallbackCoords[idx % fallbackCoords.length];
+            rawLat = fb[0];
+            rawLng = fb[1];
+          }
 
-        // Apply visual offset if multiple markers land on the exact same lat/lng spot
-        const key = `${rawLat.toFixed(3)}_${rawLng.toFixed(3)}`;
-        const overlapCount = positionMap.get(key) || 0;
-        positionMap.set(key, overlapCount + 1);
+          // Apply visual offset if multiple markers land on the exact same lat/lng spot
+          const key = `${rawLat.toFixed(3)}_${rawLng.toFixed(3)}`;
+          const overlapCount = positionMap.get(key) || 0;
+          positionMap.set(key, overlapCount + 1);
 
-        let finalLat = rawLat;
-        let finalLng = rawLng;
-        if (overlapCount > 0) {
-          const angle = (overlapCount * 2.094) + 0.5; // ~120 degrees offset angle
-          const radius = 0.0025 * overlapCount;
-          finalLat += Math.sin(angle) * radius;
-          finalLng += Math.cos(angle) * radius;
-        }
+          let finalLat = rawLat;
+          let finalLng = rawLng;
+          if (overlapCount > 0) {
+            const angle = (overlapCount * 2.094) + 0.5; // ~120 degrees offset angle
+            const radius = 0.0025 * overlapCount;
+            finalLat += Math.sin(angle) * radius;
+            finalLng += Math.cos(angle) * radius;
+          }
 
-        devicesWithCoords.push([finalLat, finalLng]);
+          devicesWithCoords.push([finalLat, finalLng]);
 
-        // Status color matching table exactly: Green = Moving, Amber = Parked/Idle, Red = Offline
-        const statusColor = !isOnline ? '#ef4444' : (isMoving ? '#10b981' : '#f59e0b');
-        const statusSymbol = !isOnline ? '🔴' : (isMoving ? '🟢' : '🟡');
-        const statusLabel = !isOnline ? 'OFFLINE' : (isMoving ? `MOVING (${(t.speed || 0).toFixed(1)} km/h)` : 'PARKED / IDLE');
+          // Status color matching table exactly: Green = Moving, Amber = Parked/Idle, Red = Offline
+          const statusColor = !isOnline ? '#ef4444' : (isMoving ? '#10b981' : '#f59e0b');
+          const statusSymbol = !isOnline ? '🔴' : (isMoving ? '🟢' : '🟡');
+          const statusLabel = !isOnline ? 'OFFLINE' : (isMoving ? `MOVING (${numSpeed.toFixed(1)} km/h)` : 'PARKED / IDLE');
 
-        const icon = L.divIcon({
-          html: `
-            <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
-              <div style="background:#0f172a;color:#ffffff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:800;border:1.5px solid ${statusColor};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);margin-bottom:2px;">
-                📡 ${v.name} (${v.id})
-              </div>
-              <div style="width:32px;height:32px;background:${statusColor};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 12px ${statusColor};display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:bold;animation:${isMoving ? 'pulse 1.5s infinite' : 'none'};">
-                ${statusSymbol}
-              </div>
-            </div>`,
-          className: '', iconSize: [100, 58], iconAnchor: [50, 50]
+          const icon = L.divIcon({
+            html: `
+              <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
+                <div style="background:#0f172a;color:#ffffff;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:800;border:1.5px solid ${statusColor};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.4);margin-bottom:2px;">
+                  📡 ${v.name || v.id} (${v.id})
+                </div>
+                <div style="width:32px;height:32px;background:${statusColor};border:2.5px solid #ffffff;border-radius:50%;box-shadow:0 0 12px ${statusColor};display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:bold;animation:${isMoving ? 'pulse 1.5s infinite' : 'none'};">
+                  ${statusSymbol}
+                </div>
+              </div>`,
+            className: '', iconSize: [100, 58], iconAnchor: [50, 50]
+          });
+
+          const marker = L.marker([finalLat, finalLng], { icon, zIndexOffset: (idx + 1) * 100 })
+            .addTo(mapInstanceRef.current._fleetMarkersGroup);
+
+          const addrText = isOnline
+            ? (t.address || currentAddress[v.id] || `${rawLat.toFixed(5)}, ${rawLng.toFixed(5)}`)
+            : 'Location Unavailable (Device Offline / Power OFF)';
+
+          const tooltipHtml = `
+            <div style="font-family:sans-serif;font-size:11px;padding:3px 5px;color:#0f172a;max-width:240px">
+              <strong style="color:${statusColor};display:block;margin-bottom:2px;">${statusSymbol} ${statusLabel} — ${v.name || v.id} (${v.id})</strong>
+              <b>📍 Address:</b> ${addrText}<br/>
+              <b>⚡ Speed:</b> ${isOnline ? numSpeed.toFixed(1) : '0.0'} km/h
+            </div>`;
+
+          marker.bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -28], opacity: 0.95 });
+
+          marker.bindPopup(`
+            <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:180px">
+              <strong style="color:#0284c7;font-size:13px">📡 ${v.name || v.id} (${v.id})</strong><br/>
+              <b>Status:</b> <span style="color:${statusColor};font-weight:700">${statusSymbol} ${statusLabel}</span><br/>
+              <b>Speed:</b> ${isOnline ? numSpeed.toFixed(1) : '0.0'} km/h<br/>
+              <b>📍 Address:</b> ${addrText}
+            </div>`);
         });
-
-        const marker = L.marker([finalLat, finalLng], { icon, zIndexOffset: (idx + 1) * 100 })
-          .addTo(mapInstanceRef.current._fleetMarkersGroup);
-
-        const addrText = isOnline
-          ? (t.address || currentAddress[v.id] || `${rawLat.toFixed(5)}, ${rawLng.toFixed(5)}`)
-          : 'Location Unavailable (Device Offline / Power OFF)';
-
-        const tooltipHtml = `
-          <div style="font-family:sans-serif;font-size:11px;padding:3px 5px;color:#0f172a;max-width:240px">
-            <strong style="color:${statusColor};display:block;margin-bottom:2px;">${statusSymbol} ${statusLabel} — ${v.name} (${v.id})</strong>
-            <b>📍 Address:</b> ${addrText}<br/>
-            <b>⚡ Speed:</b> ${isOnline ? (t.speed || 0) : 0} km/h
-          </div>`;
-
-        marker.bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -28], opacity: 0.95 });
-
-        marker.bindPopup(`
-          <div style="font-family:sans-serif;font-size:12px;color:#0f172a;padding:4px;min-width:180px">
-            <strong style="color:#0284c7;font-size:13px">📡 ${v.name} (${v.id})</strong><br/>
-            <b>Status:</b> <span style="color:${statusColor};font-weight:700">${statusSymbol} ${statusLabel}</span><br/>
-            <b>Speed:</b> ${isOnline ? (t.speed || 0) : 0} km/h<br/>
-            <b>📍 Address:</b> ${addrText}
-          </div>`);
-      });
+      } catch (err) {
+        console.warn("Error rendering fleet map markers:", err);
+      }
 
       // Auto-fit map bounds to frame ALL devices on the multi-vehicle map
       if (devicesWithCoords.length > 1) {
@@ -2229,8 +2235,8 @@ export default function App() {
                           filteredVehicles.map((v) => {
                             const t = telemetry[v.id] || {};
                             const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
-                            const isLive = t.isOnline === true && t.lat != null && typeof t.lat === 'number';
-                            const toAddr = isLive ? (t.address || currentAddress[v.id] || `${t.lat.toFixed(5)}, ${t.lng.toFixed(5)}`) : 'Location Unavailable — Device Offline';
+                            const isLive = t.isOnline === true && typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && t.lat !== 0;
+                            const toAddr = isLive ? (t.address || currentAddress[v.id] || `${Number(t.lat).toFixed(5)}, ${Number(t.lng).toFixed(5)}`) : 'Location Unavailable — Device Offline';
                             const isMoving = isLive && (t.speed || 0) > 0;
 
                             return (
