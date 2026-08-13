@@ -1372,11 +1372,14 @@ export default function App() {
     const mapInstanceRef = activeTab === 'home' ? dashboardMapInstance : trackingMapInstance;
     const markerRef = activeTab === 'home' ? dashboardMarkerInstance : trackingMarkerInstance;
 
-    // For home: centre on first online device, fallback to Coimbatore
-    const onlineDevices = vehicles.filter(v => telemetry[v.id]?.isOnline === true && telemetry[v.id]?.lat != null);
+    // For home: centre on first online device with valid coords, fallback to Coimbatore
+    const onlineDevices = vehicles.filter(v => {
+      const t = telemetry[v.id];
+      return t && t.isOnline === true && typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && !isNaN(t.lng) && t.lat !== 0 && t.lng !== 0;
+    });
     const firstOnline = onlineDevices[0] ? telemetry[onlineDevices[0].id] : null;
     const centerCoords = activeTab === 'home'
-      ? (firstOnline ? [firstOnline.lat, firstOnline.lng] : [11.02366, 76.9424])
+      ? (firstOnline && typeof firstOnline.lat === 'number' && typeof firstOnline.lng === 'number' ? [firstOnline.lat, firstOnline.lng] : [11.02366, 76.9424])
       : (hasValidCoords ? [currentData.lat, currentData.lng]
           : (mapInstanceRef.current ? [mapInstanceRef.current.getCenter().lat, mapInstanceRef.current.getCenter().lng] : [11.00659, 77.01404]));
 
@@ -1388,7 +1391,11 @@ export default function App() {
       geofenceCircleRef.current = null;
       if (container._leaflet_id) delete container._leaflet_id;
 
-      const map = L.map(container, { zoomControl: false }).setView(centerCoords, activeTab === 'home' ? 13 : (hasValidCoords ? 16 : 13));
+      const safeCenter = (Array.isArray(centerCoords) && typeof centerCoords[0] === 'number' && !isNaN(centerCoords[0]) && typeof centerCoords[1] === 'number' && !isNaN(centerCoords[1]))
+        ? centerCoords
+        : [11.02366, 76.9424];
+
+      const map = L.map(container, { zoomControl: false }).setView(safeCenter, activeTab === 'home' ? 13 : (hasValidCoords ? 16 : 13));
       mapInstanceRef.current = map;
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
