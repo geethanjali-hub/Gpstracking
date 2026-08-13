@@ -428,7 +428,13 @@ export default function App() {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/api/history/${vId}`);
+      let url = `${API_BASE}/api/history/${encodeURIComponent(vId)}`;
+      const queryParams = new URLSearchParams();
+      if (historyStartDateTime) queryParams.append('startDate', historyStartDateTime);
+      if (historyEndDateTime) queryParams.append('endDate', historyEndDateTime);
+      if (queryParams.toString()) url += `?${queryParams.toString()}`;
+
+      const res = await fetch(url);
       if (res.ok) {
         const pts = await res.json();
         if (pts && pts.length > 0) {

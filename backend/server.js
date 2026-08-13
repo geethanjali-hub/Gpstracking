@@ -1409,19 +1409,27 @@ function extractVehicleId(req) {
 app.get(['/api/history/:vehicleId', '/api/history/*'], async (req, res) => {
   try {
     const targetId = extractVehicleId(req);
+    const { startDate, endDate } = req.query;
+
+    const points = [];
     if (db) {
       const snapshot = await getDocs(collection(db, 'telemetry_history'));
-      const points = [];
       snapshot.forEach(docSnap => {
         const d = docSnap.data();
-        if ((d.vehicleId === targetId || d.topicDevice === targetId) && d.lat && d.lng) {
-          points.push(d);
+        if ((d.vehicleId === targetId || d.topicDevice === targetId) && d.lat && d.lng && d.lat !== 0 && d.lng !== 0) {
+          const t = new Date(d.timestamp).getTime();
+          const startMs = startDate ? new Date(startDate).getTime() : 0;
+          const endMs = endDate ? new Date(endDate).getTime() : Infinity;
+          if (!isNaN(t) && t >= startMs && t <= endMs) {
+            points.push(d);
+          } else if (!startDate && !endDate) {
+            points.push(d);
+          }
         }
       });
       points.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-      return res.json(points);
     }
-    res.json([]);
+    return res.json(points);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
