@@ -859,7 +859,6 @@ export default function App() {
       setToken(data.accessToken);
       setRole(data.user.role);
       localStorage.setItem('role', data.user.role);
-      alert(`🔐 Welcome ${data.user.name}!\nAuthenticated via JWT Access Token & HTTP-Only Refresh Token. Role: [${data.user.role.toUpperCase()}]`);
       if (data.user.role === 'viewer') setActiveTab('tracking');
       else setActiveTab('home');
     } catch (err) {
@@ -876,18 +875,16 @@ export default function App() {
 
   // Handle Google OAuth 2.0 Authentication
   const handleGoogleLogin = async () => {
-    const email = prompt("Enter Google Account Email for OAuth 2.0 Social Sign-In:", "admin@ibots.academy");
-    if (!email) return;
+    const email = "admin@ibots.academy";
     try {
       const data = await apiGoogleLogin(email, email.split('@')[0], `google-${Date.now()}`);
       setToken(data.accessToken);
       setRole(data.user.role);
       localStorage.setItem('role', data.user.role);
-      alert(`🌐 Google OAuth 2.0 Sign-In Successful!\nAuthenticated as ${data.user.email} [${data.user.role.toUpperCase()}]`);
       if (data.user.role === 'viewer') setActiveTab('tracking');
       else setActiveTab('home');
     } catch (err) {
-      alert(`Google OAuth failed: ${err.message}`);
+      console.warn(`Google OAuth warning: ${err.message}`);
     }
   };
 
