@@ -1724,38 +1724,6 @@ export default function App() {
                 <LayoutGrid size={14} style={{ color: 'var(--accent-cyan)' }} /> Fleet Gallery Grid
               </span>
             </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'history' ? 'active' : ''}`} onClick={() => { setActiveTab('history'); setMobileMenuOpen(false); if (selectedVehicleId) fetchRouteHistory(selectedVehicleId); }}>
-                <Clock size={14} style={{ color: '#8b5cf6' }} /> Route History Replay
-              </span>
-            </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'navigation' ? 'active' : ''}`} onClick={() => { setActiveTab('navigation'); setMobileMenuOpen(false); }}>
-                <Navigation size={14} style={{ color: '#06b6d4' }} /> Google Maps Nav &amp; ETA
-              </span>
-            </li>
-            <li>
-              <span className={`nav-link ${activeTab === 'stoppages' ? 'active' : ''}`} onClick={() => { setActiveTab('stoppages'); setMobileMenuOpen(false); if (selectedVehicleId) fetchStoppageAnalytics(selectedVehicleId); }}>
-                <Compass size={14} style={{ color: '#ef4444' }} /> Stoppage Analytics
-              </span>
-            </li>
-            <li>
-              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                <Battery size={14} /> Backup Battery Status
-              </span>
-            </li>
-            <li>
-              <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                <FileText size={14} /> Daily Running Summary
-              </span>
-            </li>
-            {role !== 'viewer' && (
-              <li>
-                <span className="nav-link" style={{ cursor: 'default', opacity: 0.65 }}>
-                  <FileText size={14} style={{ color: 'var(--accent-cyan)' }} /> Telematics Reports
-                </span>
-              </li>
-            )}
             {role === 'admin' && (
               <li>
                 <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}>
@@ -1812,20 +1780,22 @@ export default function App() {
           </div>
 
           <div className="topbar-actions">
-            <div className="topbar-device-select-box">
-              <span className="select-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📡 Select Device:</span>
-              <select
-                value={selectedVehicleId}
-                onChange={(e) => setSelectedVehicleId(e.target.value)}
-                className="topbar-select"
-              >
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>
-                    📡 {v.name} ({v.id})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {activeTab !== 'home' && (
+              <div className="topbar-device-select-box">
+                <span className="select-label" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>📡 Select Device:</span>
+                <select
+                  value={selectedVehicleId}
+                  onChange={(e) => setSelectedVehicleId(e.target.value)}
+                  className="topbar-select"
+                >
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>
+                      📡 {v.name} ({v.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <span className={`role-badge ${role}`}>{role.toUpperCase()} PROFILE</span>
           </div>
         </header>
@@ -1848,7 +1818,7 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
               {/* SECTION A: FLEET-WIDE EXECUTIVE SUMMARY CARDS (Clickable Filters) */}
-              <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
+              <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem' }}>
                 
                 <div
                   onClick={() => setStatusFilter('all')}
@@ -1887,44 +1857,6 @@ export default function App() {
                 </div>
 
                 <div
-                  onClick={() => setStatusFilter('good')}
-                  className="metric-ring-card"
-                  style={{
-                    borderLeft: '4px solid #10b981',
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === 'good' ? '0 0 12px rgba(16, 185, 129, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'good' ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-card)'
-                  }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Performing Well</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: '#10b981' }}>
-                      {vehicles.filter(v => getPerformance(v.id).rating === 'Good').length}
-                    </span>
-                    <span className="metric-card-desc">Click to filter good</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setStatusFilter('poor')}
-                  className="metric-ring-card"
-                  style={{
-                    borderLeft: '4px solid #ef4444',
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === 'poor' ? '0 0 12px rgba(239, 68, 68, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'poor' ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-card)'
-                  }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Non-Performing</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: '#ef4444' }}>
-                      {vehicles.filter(v => getPerformance(v.id).rating === 'Poor').length}
-                    </span>
-                    <span className="metric-card-desc">Click to filter faults</span>
-                  </div>
-                </div>
-
-                <div
                   onClick={() => setStatusFilter('idle')}
                   className="metric-ring-card"
                   style={{
@@ -1943,95 +1875,20 @@ export default function App() {
                   </div>
                 </div>
 
-                <div
-                  onClick={() => setStatusFilter('low_fuel')}
-                  className="metric-ring-card"
-                  style={{
-                    borderLeft: '4px solid var(--accent-red)',
-                    cursor: 'pointer',
-                    boxShadow: statusFilter === 'low_fuel' ? '0 0 12px rgba(239, 68, 68, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'low_fuel' ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-card)'
-                  }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Low Fuel</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: 'var(--accent-red)' }}>
-                      {vehicles.filter(v => (telemetry[v.id]?.fuelLevel || 0) < 15).length}
-                    </span>
-                    <span className="metric-card-desc">Click to filter low fuel</span>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setStatusFilter('all')}
-                  className="metric-ring-card"
-                  style={{ borderLeft: '4px solid var(--accent-orange)' }}
-                >
-                  <div className="metric-card-details">
-                    <span className="metric-card-title">Active Alerts</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: 'var(--accent-orange)' }}>
-                      {alerts.length}
-                    </span>
-                    <span className="metric-card-desc">Logged System Events</span>
-                  </div>
-                </div>
-
               </div>
 
-              {/* SECTION B: MULTI-VEHICLE LIVE MAP & SYSTEM ALERTS */}
-              <div className="dashboard-main-row" style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '1.25rem' }}>
+              {/* SECTION B: MULTI-VEHICLE LIVE MAP (Full Width) */}
+              <div className="dashboard-main-row" style={{ display: 'block', width: '100%' }}>
                 
                 {/* Multi-vehicle live tracking map */}
-                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '380px', minHeight: '380px' }}>
+                <div className="panel-container" style={{ padding: 0, overflow: 'hidden', height: '420px', minHeight: '420px', width: '100%' }}>
                   <div className="panel-header" style={{ padding: '0.65rem 1rem', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className="panel-title"><Map size={14} /> Multi-Vehicle Fleet Live Map</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
                       Showing {filteredVehicles.length} of {vehicles.length} vehicles {statusFilter !== 'all' ? `(Filter: ${statusFilter.toUpperCase()})` : ''}
                     </span>
                   </div>
-                  <div ref={dashboardMapRef} style={{ height: '343px', minHeight: '343px', width: '100%' }}></div>
-                </div>
-
-                {/* System alert feed */}
-                <div className="panel-container" style={{ height: '360px', display: 'flex', flexDirection: 'column' }}>
-                  <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="panel-title"><Bell size={14} style={{ color: '#ef4444' }} /> Fleet Live Alerts</span>
-                    {alerts.length > 0 && (
-                      <span style={{ backgroundColor: '#ef4444', color: '#fff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
-                        {alerts.length} New
-                      </span>
-                    )}
-                  </div>
-                  <div className="log-list" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingRight: '4px' }}>
-                    {alerts.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        ✅ No system alerts recorded. All vehicles operational.
-                      </div>
-                    ) : (
-                      alerts.map(log => (
-                        <div key={log.id} style={{
-                          padding: '0.65rem 0.75rem',
-                          borderRadius: '6px',
-                          background: log.type === 'STATIONARY_1HR' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(2, 132, 199, 0.06)',
-                          borderLeft: log.type === 'STATIONARY_1HR' ? '4px solid #ef4444' : '4px solid #0284c7',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                            <strong style={{ color: log.type === 'STATIONARY_1HR' ? '#ef4444' : '#0284c7', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <AlertTriangle size={12} /> {log.title || log.type}
-                            </strong>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
-                          </div>
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', margin: 0 }}>{log.message}</p>
-                          {log.address && (
-                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                              📍 {log.address}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <div ref={dashboardMapRef} style={{ height: '380px', minHeight: '380px', width: '100%' }}></div>
                 </div>
 
               </div>
