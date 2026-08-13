@@ -332,6 +332,8 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [isReplaying, setIsReplaying] = useState(false);
+  const [historyStartDateTime, setHistoryStartDateTime] = useState('');
+  const [historyEndDateTime, setHistoryEndDateTime] = useState('');
   const replayTimerRef = useRef(null);
 
   // Fetch Route History Trail for selected vehicle
