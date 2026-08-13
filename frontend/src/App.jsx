@@ -2333,28 +2333,30 @@ export default function App() {
                     }
                   </div>
 
-                  {/* Locate Vehicle button on map canvas */}
-                  <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 1000 }}>
+                  {/* Locate Vehicle button on map canvas (bottom right corner) */}
+                  <div style={{ position: 'absolute', bottom: '26px', right: '12px', zIndex: 1000 }}>
                     <button
                       type="button"
+                      title="Locate Vehicle on Map"
                       onClick={() => {
                         if (trackingMapInstance.current && currentData.lat && currentData.lng) {
                           trackingMapInstance.current.setView([currentData.lat, currentData.lng], 17);
                         }
                       }}
                       style={{
-                        backgroundColor: '#0f172a',
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
                         color: '#06b6d4',
                         border: '2px solid #06b6d4',
                         padding: '0.45rem 0.85rem',
-                        borderRadius: '6px',
+                        borderRadius: '24px',
                         fontSize: '0.78rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.6)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.4rem'
+                        gap: '0.4rem',
+                        backdropFilter: 'blur(4px)'
                       }}
                     >
                       🎯 Locate Vehicle
