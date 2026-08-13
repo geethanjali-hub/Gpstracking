@@ -28,7 +28,9 @@ import {
   Eye,
   CheckCircle2,
   Menu,
-  X
+  X,
+  Pencil,
+  Truck
 } from 'lucide-react';
 import Chart from 'chart.js/auto';
 import L from 'leaflet';
@@ -714,6 +716,30 @@ export default function App() {
   const [newDeviceId, setNewDeviceId] = useState('');
   const [newDeviceTopic, setNewDeviceTopic] = useState('');
   const [newDeviceBroker, setNewDeviceBroker] = useState('mqtt://test.mosquitto.org:1883');
+  const [editingDeviceId, setEditingDeviceId] = useState(null);
+
+  // Populate form for editing existing hardware device
+  const handleStartEditVehicle = (v) => {
+    const mappedUser = systemUsers.find(u => u.assignedVehicle === v.id);
+    setEditingDeviceId(v.id);
+    setNewUserName(v.userName || mappedUser?.name || '');
+    setNewDeviceId(v.id);
+    setNewVehicleName(v.name || '');
+    setNewDeviceTopic(v.topic || '');
+    setNewDeviceBroker(v.broker || 'mqtt://test.mosquitto.org:1883');
+
+    const formEl = document.getElementById('device-registration-form');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDeviceId(null);
+    setNewUserName('');
+    setNewDeviceId('');
+    setNewVehicleName('');
+    setNewDeviceTopic('');
+    setNewDeviceBroker('mqtt://test.mosquitto.org:1883');
+  };
 
   // Dedicated Emergency SMS Phone Numbers Form State (Max 5 Numbers for ESP32 GSM Module)
   const [smsTargetVehicleId, setSmsTargetVehicleId] = useState('');
@@ -1086,7 +1112,7 @@ export default function App() {
     }
   };
 
-  // Add New System User & Map Device / MQTT Topic / Broker
+  // Add/Update System User & Map Device / MQTT Topic / Broker
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newUserName) return;
@@ -1098,7 +1124,6 @@ export default function App() {
     const deviceNameClean = newVehicleName.trim() || `${userClean}'s Device (${deviceIdClean})`;
 
     try {
-      // 1. Post to backend API to register new vehicle / device & persist to DB
       const res = await fetch(`${API_BASE}/api/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1113,33 +1138,41 @@ export default function App() {
       });
 
       if (res.ok) {
-        // 2. Add new user to systemUsers list
-        const newUserObj = {
-          id: `usr-${Date.now()}`,
-          username: userClean.toLowerCase().replace(/\s+/g, '_'),
-          role: newUserRole,
-          name: userClean,
-          assignedVehicle: deviceIdClean,
-          topic: topicClean,
-          broker: brokerClean,
-          status: 'Active'
-        };
-        setSystemUsers(prev => [...prev, newUserObj]);
+        setSystemUsers(prev => {
+          const exists = prev.some(u => u.assignedVehicle === deviceIdClean);
+          if (exists) {
+            return prev.map(u => u.assignedVehicle === deviceIdClean ? { ...u, name: userClean, username: userClean.toLowerCase().replace(/\s+/g, '_') } : u);
+          }
+          return [...prev, {
+            id: `usr-${Date.now()}`,
+            username: userClean.toLowerCase().replace(/\s+/g, '_'),
+            role: newUserRole,
+            name: userClean,
+            assignedVehicle: deviceIdClean,
+            topic: topicClean,
+            broker: brokerClean,
+            status: 'Active'
+          }];
+        });
 
-        // 3. Clear form inputs
         setNewUserName('');
         setNewUserPassword('');
         setNewDeviceId('');
         setNewDeviceTopic('');
         setNewVehicleName('');
+        const wasEdit = !!editingDeviceId;
+        setEditingDeviceId(null);
 
-        // 4. Refresh vehicle list from DB and select the new device
         await fetchVehicles();
         setSelectedVehicleId(deviceIdClean);
 
-        alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
+        if (wasEdit) {
+          alert(`✏️ Device "${deviceIdClean}" details updated successfully in database!`);
+        } else {
+          alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
+        }
       } else {
-        alert("Failed to register device on server database.");
+        alert("Failed to save device on server database.");
       }
     } catch (err) {
       console.error(err);
@@ -1877,7 +1910,7 @@ export default function App() {
             {role === 'admin' && (
               <li>
                 <span className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false); }}>
-                  <User size={14} /> User Management
+                  <Truck size={14} /> Vehicle Management
                 </span>
               </li>
             )}
@@ -1925,7 +1958,7 @@ export default function App() {
               {activeTab === 'battery' && 'Backup Battery Status'}
               {activeTab === 'summary' && 'Daily Running Summary'}
               {activeTab === 'reports' && 'Reports Generation'}
-              {activeTab === 'settings' && 'User Management'}
+              {activeTab === 'settings' && 'Vehicle Management'}
             </h2>
           </div>
 
@@ -3384,20 +3417,22 @@ export default function App() {
             </div>
           )}
 
-          {/* USER MANAGEMENT TAB */}
+          {/* VEHICLE MANAGEMENT TAB */}
           {activeTab === 'settings' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               
               <div>
                 <h3 style={{ fontSize: '1rem', color: 'var(--accent-cyan)', marginBottom: '0.85rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
-                  👥 User &amp; Hardware Device Management
+                  🚙 Vehicle &amp; Hardware Device Management
                 </h3>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
                   
-                  {/* 1. Register & Save Hardware Device */}
-                  <div className="panel-container">
-                    <span className="panel-title">Register &amp; Save Device</span>
+                  {/* 1. Register & Save / Edit Hardware Device */}
+                  <div id="device-registration-form" className="panel-container">
+                    <span className="panel-title" style={{ color: editingDeviceId ? 'var(--accent-orange)' : 'var(--accent-cyan)' }}>
+                      {editingDeviceId ? `✏️ Edit Hardware Device (${editingDeviceId})` : 'Register & Save Device'}
+                    </span>
                     <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                       <div className="form-group">
                         <label>Full User Name</label>
@@ -3405,7 +3440,7 @@ export default function App() {
                       </div>
                       <div className="form-group">
                         <label>Tracker ID / Device ID</label>
-                        <input type="text" className="form-input" placeholder="Add numbers like 1.2.3" value={newDeviceId} onChange={e => setNewDeviceId(e.target.value)} required />
+                        <input type="text" className="form-input" placeholder="Add numbers like 1.2.3" value={newDeviceId} onChange={e => setNewDeviceId(e.target.value)} required readOnly={!!editingDeviceId} style={{ backgroundColor: editingDeviceId ? 'rgba(255,255,255,0.05)' : undefined }} />
                       </div>
                       <div className="form-group">
                         <label>Tracker Name / Alias</label>
@@ -3420,9 +3455,16 @@ export default function App() {
                         <input type="text" className="form-input" placeholder="e.g. mqtt://test.mosquitto.org:1883" value={newDeviceBroker} onChange={e => setNewDeviceBroker(e.target.value)} required />
                       </div>
 
-                      <button type="submit" className="action-btn" style={{ marginTop: '0.5rem', backgroundColor: 'var(--accent-cyan)' }}>
-                        💾 Save Device
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button type="submit" className="action-btn" style={{ flex: 1, backgroundColor: editingDeviceId ? 'var(--accent-orange)' : 'var(--accent-cyan)', color: editingDeviceId ? '#000' : '#fff', fontWeight: 700 }}>
+                          {editingDeviceId ? '✏️ Update Device' : '💾 Save Device'}
+                        </button>
+                        {editingDeviceId && (
+                          <button type="button" onClick={handleCancelEdit} className="action-btn secondary" style={{ flex: 1 }}>
+                            ❌ Cancel Edit
+                          </button>
+                        )}
+                      </div>
                     </form>
                   </div>
 
@@ -3584,25 +3626,46 @@ export default function App() {
                                 )}
                               </div>
 
-                              <button
-                                onClick={() => handleDeleteVehicle(v.id)}
-                                title={`Delete ${v.name}`}
-                                style={{
-                                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                                  color: 'var(--accent-red)',
-                                  padding: '0.4rem 0.65rem',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 600
-                                }}
-                              >
-                                <Trash2 size={14} /> Delete
-                              </button>
+                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                <button
+                                  onClick={() => handleStartEditVehicle(v)}
+                                  title={`Edit ${v.name}`}
+                                  style={{
+                                    backgroundColor: 'rgba(2, 132, 199, 0.15)',
+                                    border: '1px solid rgba(2, 132, 199, 0.4)',
+                                    color: '#0284c7',
+                                    padding: '0.4rem 0.65rem',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  <Pencil size={14} /> Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteVehicle(v.id)}
+                                  title={`Delete ${v.name}`}
+                                  style={{
+                                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                                    color: 'var(--accent-red)',
+                                    padding: '0.4rem 0.65rem',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </div>
                             </div>
                           );
                         })
