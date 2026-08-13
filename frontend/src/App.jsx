@@ -2360,7 +2360,7 @@ export default function App() {
                             <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
                             <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
                             <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
-                            <div><strong>Coordinates:</strong> {!isOff && tData.lat ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Offline'}</div>
+                            <div><strong>Coordinates:</strong> {!isOff && typeof tData.lat === 'number' && typeof tData.lng === 'number' ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Offline'}</div>
                             <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
                             <div><strong>Backup Battery:</strong> <span style={{ color: '#10b981', fontWeight: 700 }}>{tData.backupBatteryPercent || 100}%</span></div>
                           </div>
@@ -2521,21 +2521,21 @@ export default function App() {
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                        {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.street || currentStreet[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
+                        {currentData.isOnline !== true || typeof currentData.lat !== 'number' || typeof currentData.lng !== 'number' ? 'Offline' : (currentData.street || currentStreet[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                       </span>
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🏡 Area / Locality</span>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#10b981', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                        {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.area || currentArea[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
+                        {currentData.isOnline !== true || typeof currentData.lat !== 'number' || typeof currentData.lng !== 'number' ? 'Offline' : (currentData.area || currentArea[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                       </span>
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address &amp; PIN</span>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                        {currentData.isOnline !== true || !currentData.lat ? 'Offline' : (currentData.address || currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
+                        {currentData.isOnline !== true || typeof currentData.lat !== 'number' || typeof currentData.lng !== 'number' ? 'Offline' : (currentData.address || currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                       </span>
                     </div>
 
