@@ -506,24 +506,6 @@ const addressCache = new Map();
 async function getAddressFromCoords(lat, lng) {
   if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
     return {
-      address: "Awaiting Live GPS Signal...",
-      street: "Unknown Road",
-      road: "Unknown Road",
-      area: "Unknown Area",
-      suburb: "Unknown Area",
-      city: "",
-      state: "",
-      postcode: ""
-    };
-  }
-  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-  if (addressCache.has(key)) {
-    return addressCache.get(key);
-  }
-
-async function getAddressFromCoords(lat, lng) {
-  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
-    return {
       address: "No Signal — Device Offline",
       street: "Offline",
       road: "Offline",
