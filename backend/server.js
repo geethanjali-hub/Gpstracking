@@ -22,6 +22,14 @@ import {
   authenticateToken,
   requireRole
 } from './auth.js';
+import { connectDB } from './db.js';
+import { Vehicle } from './models/Vehicle.js';
+import { TelemetryHistory } from './models/TelemetryHistory.js';
+import { User as UserModel } from './models/User.js';
+import { Alert as AlertModel } from './models/Alert.js';
+
+// Initialize MongoDB Connection
+connectDB();
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -761,15 +769,26 @@ app.post('/api/telemetry', async (req, res) => {
   }
 });
 
-// 2. Fetch Fleet Vehicles — Reads directly from Firebase Firestore Cloud Database ('vehicles')
+// 2. Fetch Fleet Vehicles — Reads directly from MongoDB Database ('vehicles')
 app.get('/api/vehicles', async (req, res) => {
+  try {
+    const mongoVehicles = await Vehicle.find({}).lean();
+    if (mongoVehicles && mongoVehicles.length > 0) {
+      localVehicles = mongoVehicles;
+      return res.json(mongoVehicles);
+    }
+  } catch (mongoErr) {
+    console.warn("⚠️ MongoDB fetch vehicles warning:", mongoErr.message);
+  }
   try {
     if (db) {
       const querySnapshot = await getDocs(collection(db, 'vehicles'));
       const fbVehicles = [];
       querySnapshot.forEach(docSnap => fbVehicles.push(docSnap.data()));
-      localVehicles = fbVehicles;
-      return res.json(fbVehicles); // Returns [] when deleted from Firestore!
+      if (fbVehicles.length > 0) {
+        localVehicles = fbVehicles;
+        return res.json(fbVehicles);
+      }
     }
   } catch (fbErr) {
     console.warn("⚠️ Firebase Firestore fetch warning:", fbErr.message);
@@ -1251,7 +1270,37 @@ mqttClient.on('message', async (topic, message) => {
     // ⚡ 1. ZERO-DELAY WEBSOCKET BROADCAST TO FRONTEND (Executes immediately < 50ms)
     broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId, data: telemetryDoc });
 
-    // 📜 2. HISTORICAL ROUTE LOGGING (Stores history trail points in Firestore collection 'telemetry_history')
+    // 📜 2. HISTORICAL ROUTE LOGGING (Stores history trail points in MongoDB 'telemetry_histories')
+    if (hasValidCoords) {
+      TelemetryHistory.create({
+        vehicleId,
+        lat,
+        lng,
+        speed: telemetryDoc.speed,
+        altitude: telemetryDoc.altitude,
+        satellites: telemetryDoc.satellites,
+        address: telemetryDoc.address,
+        street: telemetryDoc.street,
+        area: telemetryDoc.area,
+        status: telemetryDoc.speed > 0 ? 'moving' : 'parked',
+        timestamp: new Date()
+      }).catch(err => console.warn("⚠️ MongoDB history save warning:", err.message));
+
+      Vehicle.findOneAndUpdate(
+        { id: vehicleId },
+        {
+          $set: {
+            status: 'online',
+            latestTelemetry: {
+              ...telemetryDoc,
+              timestamp: new Date()
+            }
+          }
+        },
+        { upsert: true }
+      ).catch(err => console.warn("⚠️ MongoDB vehicle update warning:", err.message));
+    }
+
     if (hasValidCoords && db) {
       const historyDoc = {
         vehicleId,
@@ -1405,11 +1454,28 @@ function extractVehicleId(req) {
   return decodeURIComponent(raw).trim();
 }
 
-// REST APIs for Route History Replay
+// REST APIs for Route History Replay — Powered by MongoDB
 app.get(['/api/history/:vehicleId', '/api/history/*'], async (req, res) => {
   try {
     const targetId = extractVehicleId(req);
     const { startDate, endDate } = req.query;
+
+    // Build MongoDB query
+    const mongoQuery = { vehicleId: targetId };
+    if (startDate || endDate) {
+      mongoQuery.timestamp = {};
+      if (startDate) mongoQuery.timestamp.$gte = new Date(startDate);
+      if (endDate) mongoQuery.timestamp.$lte = new Date(endDate);
+    }
+
+    try {
+      const mongoPoints = await TelemetryHistory.find(mongoQuery).sort({ timestamp: 1 }).lean();
+      if (mongoPoints && mongoPoints.length > 0) {
+        return res.json(mongoPoints);
+      }
+    } catch (mongoErr) {
+      console.warn("⚠️ MongoDB history fetch warning:", mongoErr.message);
+    }
 
     const points = [];
     if (db) {
