@@ -887,7 +887,7 @@ app.post('/api/vehicles', async (req, res) => {
 });
 
 // 4. Delete Vehicle & Dynamic Device directly from Firebase Firestore Cloud Database
-app.delete(['/api/vehicles/:id', '/api/vehicles/*'], async (req, res) => {
+app.delete('/api/vehicles/:id', async (req, res) => {
   try {
     const rawId = req.params.id || req.params[0] || '';
     const targetId = decodeURIComponent(rawId).trim();
@@ -1437,7 +1437,7 @@ function extractVehicleId(req) {
 }
 
 // REST APIs for Route History Replay — Powered by MongoDB
-app.get(['/api/history/:vehicleId', '/api/history/*'], async (req, res) => {
+app.get('/api/history/:vehicleId', async (req, res) => {
   try {
     const targetId = extractVehicleId(req);
     const { startDate, endDate } = req.query;
@@ -1484,7 +1484,7 @@ app.get(['/api/history/:vehicleId', '/api/history/*'], async (req, res) => {
 });
 
 // Telemetry Diagnostics Chart Data API
-app.get(['/api/charts/:vehicleId', '/api/charts/*'], async (req, res) => {
+app.get('/api/charts/:vehicleId', async (req, res) => {
   try {
     const targetId = extractVehicleId(req);
 
@@ -1530,7 +1530,7 @@ app.get(['/api/charts/:vehicleId', '/api/charts/*'], async (req, res) => {
 });
 
 // Vibration & Shock Spike Data API
-app.get(['/api/shock/:vehicleId', '/api/shock/*'], (req, res) => {
+app.get('/api/shock/:vehicleId', (req, res) => {
   const targetId = extractVehicleId(req);
   const live = localTelemetry[targetId] || {};
   
@@ -1544,7 +1544,7 @@ app.get(['/api/shock/:vehicleId', '/api/shock/*'], (req, res) => {
 });
 
 // Daily Running Mileage & Hours Summary API
-app.get(['/api/summaries/:vehicleId', '/api/summaries/*'], async (req, res) => {
+app.get('/api/summaries/:vehicleId', async (req, res) => {
   try {
     const targetId = extractVehicleId(req);
     const live = localTelemetry[targetId] || {};
