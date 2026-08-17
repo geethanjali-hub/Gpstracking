@@ -179,12 +179,16 @@ app.get('/api-spec.json', (req, res) => {
   res.json(openApiSpec);
 });
 
-// Pure Backend Root Status API Endpoint
+// Serve Web Dashboard Frontend or API Status
 app.get('/', (req, res) => {
+  const distHtml = path.join(__dirname, '../frontend/dist/index.html');
+  if (fs.existsSync(distHtml)) {
+    return res.sendFile(distHtml);
+  }
   res.json({
     status: 'online',
     service: 'Armstrong GPS Telematics Backend API',
-    database: 'Firebase Cloud Database (ibots-gps)',
+    database: 'MongoDB Database (gpstracking)',
     docs: '/docs',
     endpoints: {
       vehicles: '/api/vehicles',
