@@ -284,8 +284,7 @@ function loadDatabase() {
   } catch (err) {
     console.warn("⚠️ Local DB load warning:", err.message);
   }
-  saveDatabase(defaultVehicles);
-  return defaultVehicles;
+  return [];
 }
 
 function saveDatabase(data) {
@@ -586,7 +585,7 @@ app.get('/api/telemetry', (req, res) => {
 
   // Build merged map: registered vehicles + live MQTT data
   // Devices that have NEVER received an MQTT packet are shown as OFFLINE with null location
-  const activeVehicles = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
+  const activeVehicles = Array.isArray(localVehicles) ? localVehicles : [];
   const mergedTelemetry = {};
   activeVehicles.forEach(v => {
     const live = localTelemetry[v.id] || localTelemetryByTopic[v.topic];
@@ -1121,7 +1120,7 @@ function safePublishMQTT(client, topic, payload) {
 // 📱 DUAL-BROKER CONTINUOUS RECURRING MQTT SYNC ENGINE
 // Re-broadcasts all configured Emergency Phone Numbers & Config to BOTH HiveMQ & Mosquitto every 5s continuously
 function broadcastAllVehicleNumbersMQTT() {
-  const listToSync = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
+  const listToSync = Array.isArray(localVehicles) ? localVehicles : [];
 
   listToSync.forEach(vehicle => {
     const vId = vehicle.id || '2';
@@ -1215,6 +1214,22 @@ async function handleIncomingTelemetry(brokerName, topic, message) {
       (v.topic && v.topic.includes(deviceFromTopic))
     );
     const vehicleId = matchedVehicle ? matchedVehicle.id : deviceFromTopic;
+
+    // Pure Dynamic Registration: Automatically register new hardware tracker on MQTT message if not existing
+    if (!matchedVehicle && vehicleId) {
+      const newDynamicVehicle = {
+        id: vehicleId,
+        name: `Tracker ${deviceFromTopic}`,
+        userName: 'Dynamic Device',
+        vin: `IBOTS-${deviceFromTopic.toUpperCase()}-2026`,
+        status: 'online',
+        topic: topic,
+        broker: brokerName,
+        createdAt: new Date().toISOString()
+      };
+      localVehicles.push(newDynamicVehicle);
+      Vehicle.findOneAndUpdate({ id: vehicleId }, newDynamicVehicle, { upsert: true }).catch(() => {});
+    }
 
     // Track device liveness timestamp strictly by topic & vehicleId
     const now = Date.now();

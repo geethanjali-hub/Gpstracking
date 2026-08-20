@@ -37,8 +37,8 @@ def run_ssh_command(custom_cmd=None):
             port, 
             username, 
             password, 
-            timeout=15, 
-            banner_timeout=30,
+            timeout=40, 
+            banner_timeout=60,
             gss_auth=False,
             gss_kex=False
         )
