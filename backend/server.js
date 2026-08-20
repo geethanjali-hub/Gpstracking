@@ -1068,8 +1068,9 @@ app.post('/api/webhook/deploy', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DUAL MQTT BROKER SYSTEM — HiveMQ (Primary) + Eclipse Mosquitto (Fallback)
+// MULTI-BROKER MQTT SYSTEM — HiveMQ WSS (Port 8884) + HiveMQ TCP (Port 1883) + Mosquitto
 // ═══════════════════════════════════════════════════════════════════════════
+const HIVEMQ_WSS_URL = process.env.HIVEMQ_WSS_URL || 'wss://broker.hivemq.com:8884/mqtt';
 const HIVEMQ_PRIMARY_URL = process.env.HIVEMQ_BROKER_URL || 'mqtt://broker.hivemq.com:1883';
 const MOSQUITTO_FALLBACK_URL = process.env.MOSQUITTO_BROKER_URL || 'mqtt://test.mosquitto.org:1883';
 
@@ -1081,11 +1082,27 @@ const MQTT_TOPICS = [
   'sedhupathi/+'
 ];
 
-// HiveMQ Primary Client
-const hivemqClient = mqtt.connect(HIVEMQ_PRIMARY_URL, {
-  clientId: 'ibots-hivemq-' + Math.random().toString(16).slice(2, 10),
+const hivemqAuthOptions = {
   clean: true,
-  reconnectPeriod: 5000
+  reconnectPeriod: 5000,
+  rejectUnauthorized: false
+};
+
+if (process.env.HIVEMQ_USERNAME && process.env.HIVEMQ_PASSWORD) {
+  hivemqAuthOptions.username = process.env.HIVEMQ_USERNAME;
+  hivemqAuthOptions.password = process.env.HIVEMQ_PASSWORD;
+}
+
+// HiveMQ WSS Client (Port 8884)
+const hivemqWssClient = mqtt.connect(HIVEMQ_WSS_URL, {
+  ...hivemqAuthOptions,
+  clientId: 'ibots-hivemq-wss-' + Math.random().toString(16).slice(2, 10)
+});
+
+// HiveMQ Primary Client (Port 1883)
+const hivemqClient = mqtt.connect(HIVEMQ_PRIMARY_URL, {
+  ...hivemqAuthOptions,
+  clientId: 'ibots-hivemq-tcp-' + Math.random().toString(16).slice(2, 10)
 });
 
 // Eclipse Mosquitto Fallback Client
@@ -1096,7 +1113,7 @@ const mosquittoClient = mqtt.connect(MOSQUITTO_FALLBACK_URL, {
 });
 
 // Maintain primary mqttClient reference for backward compatibility
-const mqttClient = hivemqClient;
+const mqttClient = hivemqWssClient;
 
 const DEFAULT_EMERGENCY_NUMBERS = [
   "+919740383725",
@@ -1112,8 +1129,8 @@ function safePublishMQTT(client, topic, payload) {
   }
 }
 
-// 📱 DUAL-BROKER CONTINUOUS RECURRING MQTT SYNC ENGINE
-// Re-broadcasts all configured Emergency Phone Numbers & Config to BOTH HiveMQ & Mosquitto every 5s continuously
+// 📱 MULTI-BROKER CONTINUOUS RECURRING MQTT SYNC ENGINE
+// Re-broadcasts all configured Emergency Phone Numbers & Config to HiveMQ (WSS 8884 + TCP 1883) & Mosquitto every 5s continuously
 function broadcastAllVehicleNumbersMQTT() {
   const listToSync = Array.isArray(localVehicles) ? localVehicles : [];
 
@@ -1142,6 +1159,7 @@ function broadcastAllVehicleNumbersMQTT() {
     ];
 
     targetTopics.forEach(top => {
+      safePublishMQTT(hivemqWssClient, top, payload);
       safePublishMQTT(hivemqClient, top, payload);
       safePublishMQTT(mosquittoClient, top, payload);
     });
@@ -1151,7 +1169,7 @@ function broadcastAllVehicleNumbersMQTT() {
 // Continuously re-publish emergency numbers every 5 seconds across both brokers
 setInterval(broadcastAllVehicleNumbersMQTT, 5000);
 
-// Attach Subscriptions & Handlers for HiveMQ Primary & Mosquitto Fallback Brokers
+// Attach Subscriptions & Handlers for HiveMQ (WSS 8884 + TCP 1883) & Mosquitto Fallback Brokers
 function setupBroker(client, name, url) {
   client.on('connect', () => {
     console.log(`📡 MQTT [${name}]: Connected to ${url}`);
@@ -1178,7 +1196,8 @@ function setupBroker(client, name, url) {
   });
 }
 
-setupBroker(hivemqClient, 'HiveMQ Primary', HIVEMQ_PRIMARY_URL);
+setupBroker(hivemqWssClient, 'HiveMQ WSS (Port 8884)', HIVEMQ_WSS_URL);
+setupBroker(hivemqClient, 'HiveMQ TCP (Port 1883)', HIVEMQ_PRIMARY_URL);
 setupBroker(mosquittoClient, 'Mosquitto Fallback', MOSQUITTO_FALLBACK_URL);
 
 // Process incoming MQTT messages from ESP32 & Quectel EC200U hardware across HiveMQ & Mosquitto
