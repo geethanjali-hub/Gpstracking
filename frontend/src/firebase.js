@@ -64,14 +64,17 @@ export function subscribeToVehicles(onUpdate) {
     return onSnapshot(collection(db, 'vehicles'), (snapshot) => {
       const vehicleList = [];
       snapshot.forEach((docSnap) => {
-        const vData = docSnap.data();
-        if (vData && vData.id) {
+        const vData = docSnap.data() || {};
+        const vId = vData.id || vData.tracker_id || docSnap.id;
+        if (vId) {
           vehicleList.push({
             ...vData,
-            name: vData.name || `Tracker (${vData.id})`
+            id: vId,
+            name: vData.name || vData.title || `Tracker (${vId})`
           });
         }
       });
+      console.log(`🔥 Firestore 'vehicles' listener loaded ${vehicleList.length} devices`);
       onUpdate(vehicleList);
     }, (error) => {
       console.warn("Firestore vehicles listener warning:", error.message);

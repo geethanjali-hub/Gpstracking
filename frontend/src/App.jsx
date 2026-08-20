@@ -1320,16 +1320,28 @@ export default function App() {
     });
   };
 
-  // Firebase Real-Time Listener with deduplication
+  // Firebase Real-Time Listeners for Vehicles & Telemetry
   useEffect(() => {
-    const unsubscribe = subscribeToTelemetry((liveData) => {
+    const unsubVehicles = subscribeToVehicles((fbVehicles) => {
+      if (Array.isArray(fbVehicles) && fbVehicles.length > 0) {
+        console.log(`🔥 Firebase Vehicles loaded ${fbVehicles.length} devices:`, fbVehicles);
+        setVehicles(fbVehicles);
+        setSelectedVehicleId(prev => (prev && fbVehicles.some(v => v.id === prev)) ? prev : fbVehicles[0].id);
+      }
+    });
+
+    const unsubTelemetry = subscribeToTelemetry((liveData) => {
       if (liveData && Object.keys(liveData).length > 0) {
         for (const vid in liveData) {
           applyTelemetryUpdate(vid, liveData[vid]);
         }
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      if (typeof unsubVehicles === 'function') unsubVehicles();
+      if (typeof unsubTelemetry === 'function') unsubTelemetry();
+    };
   }, []);
 
   // WebSockets setup for live hardware telemetry
