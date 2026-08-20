@@ -504,6 +504,8 @@ app.post('/api/auth/google', async (req, res) => {
 let localTelemetry = {};
 let localTelemetryByTopic = {};
 const addressCache = new Map();
+const deviceLastSeen = new Map();
+const OFFLINE_TIMEOUT_MS = 15000; // Strictly 15 seconds timeout for live hardware status
 
 // Helper: Reverse Geocode (lat, lng) -> Road, Area, City, State, Full Address
 async function getAddressFromCoords(lat, lng) {
@@ -738,31 +740,40 @@ app.post('/api/telemetry', async (req, res) => {
   }
 });
 
-// 2. Fetch Fleet Vehicles — Reads directly from MongoDB Database ('vehicles')
+// 2. Fetch Fleet Vehicles — Reads from MongoDB and computes dynamic hardware online/offline status
 app.get('/api/vehicles', async (req, res) => {
+  let fetchedVehicles = [];
   try {
     const mongoVehicles = await Vehicle.find({}).lean();
     if (mongoVehicles && mongoVehicles.length > 0) {
-      localVehicles = mongoVehicles;
-      return res.json(mongoVehicles);
+      fetchedVehicles = mongoVehicles;
     }
   } catch (mongoErr) {
     console.warn("⚠️ MongoDB fetch vehicles warning:", mongoErr.message);
   }
-  try {
-    if (db) {
-      const querySnapshot = await getDocs(collection(db, 'vehicles'));
-      const fbVehicles = [];
-      querySnapshot.forEach(docSnap => fbVehicles.push(docSnap.data()));
-      if (fbVehicles.length > 0) {
-        localVehicles = fbVehicles;
-        return res.json(fbVehicles);
-      }
-    }
-  } catch (fbErr) {
-    console.warn("⚠️ Firebase Firestore fetch warning:", fbErr.message);
+
+  if (fetchedVehicles.length === 0) {
+    fetchedVehicles = localVehicles;
   }
-  res.json(localVehicles);
+
+  // Strictly compute dynamic online/offline status based on real-time hardware MQTT packet timestamps
+  const now = Date.now();
+  const dynamicVehicles = fetchedVehicles.map(v => {
+    const lastSeenByVehicle = deviceLastSeen.get(v.id) || 0;
+    const lastSeenByTopic = v.topic ? (deviceLastSeen.get(v.topic) || 0) : 0;
+    const mostRecentSeen = Math.max(lastSeenByVehicle, lastSeenByTopic);
+    const isOnline = (now - mostRecentSeen) <= OFFLINE_TIMEOUT_MS && mostRecentSeen > 0;
+
+    return {
+      ...v,
+      status: isOnline ? 'online' : 'offline',
+      isOnline,
+      lastSeen: mostRecentSeen ? new Date(mostRecentSeen).toISOString() : 'Never'
+    };
+  });
+
+  localVehicles = dynamicVehicles;
+  res.json(dynamicVehicles);
 });
 
 
@@ -1693,10 +1704,8 @@ app.get('/api/alerts', async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HARDWARE LIVENESS & OFFLINE DETECTION MONITOR
-// Runs every 4 seconds — checks ALL registered vehicles and marks offline if no packet for > 20s
+// Runs every 3 seconds — checks ALL registered vehicles and marks offline if no packet for > 15s
 // ═══════════════════════════════════════════════════════════════════════════
-const deviceLastSeen = new Map();
-const OFFLINE_TIMEOUT_MS = 20000; // Mark device offline if no packet for > 20s
 
 setInterval(() => {
   const now = Date.now();
