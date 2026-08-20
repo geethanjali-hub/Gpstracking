@@ -260,70 +260,19 @@ function broadcast(data) {
 // ═══════════════════════════════════════════════════════════════════════════
 const DB_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vehicles_db.json');
 
-const defaultVehicles = [
-  {
-    id: 'usr-1_v1',
-    name: 'GPS V1',
-    userName: 'Geethanjali',
-    vin: 'OBD_TRK_9001',
-    status: 'online',
-    topic: 'ibots/tracker/1/location',
-    broker: 'wss://broker.hivemq.com:8884/mqtt',
-    phoneNumbers: ["+919740383725", "+919035596960"],
-    smsAlertStatus: 'ON',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-1_v2',
-    name: 'GPS v2',
-    userName: 'Fleet Driver 1',
-    vin: 'OBD_TRK_9002',
-    status: 'online',
-    topic: 'ibots/tracker/2/location',
-    broker: 'wss://broker.hivemq.com:8884/mqtt',
-    phoneNumbers: ["+919740383725", "+919035596960"],
-    smsAlertStatus: 'ON',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'usr-1_v3',
-    name: 'gps v3',
-    userName: 'Fleet Driver 2',
-    vin: 'OBD_TRK_9003',
-    status: 'online',
-    topic: 'ibots/tracker/3/location',
-    broker: 'wss://broker.hivemq.com:8884/mqtt',
-    phoneNumbers: ["+919740383725", "+919035596960"],
-    smsAlertStatus: 'ON',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: '2',
-    name: 'Tracker 2 (HiveMQ)',
-    userName: 'HiveMQ Live Device',
-    vin: 'HIVEMQ_TRK_002',
-    status: 'online',
-    topic: 'ibots/tracker/2/location',
-    broker: 'wss://broker.hivemq.com:8884/mqtt',
-    phoneNumbers: ["+919740383725"],
-    smsAlertStatus: 'ON',
-    createdAt: new Date().toISOString()
-  }
-];
-
+const defaultVehicles = [];
 
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf8');
       const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (err) {
     console.warn("⚠️ Local DB load warning:", err.message);
   }
-  saveDatabase(defaultVehicles);
-  return defaultVehicles;
+  return [];
 }
 
 function saveDatabase(data) {
@@ -542,107 +491,8 @@ const initialNow = Date.now();
 const deviceLastSeen = new Map();
 const OFFLINE_TIMEOUT_MS = 15000;
 
-let localTelemetry = {
-  'usr-1_v1': {
-    vehicleId: 'usr-1_v1',
-    topic: 'ibots/tracker/1/location',
-    isOnline: true,
-    status: 'online',
-    gpsValid: true,
-    fix: true,
-    lat: 11.0168,
-    lng: 76.9558,
-    address: 'Gandhipuram, Coimbatore, Tamil Nadu',
-    street: 'Cross Cut Road',
-    area: 'Gandhipuram',
-    city: 'Coimbatore',
-    state: 'Tamil Nadu',
-    speed: 38,
-    heading: 90,
-    satellites: 12,
-    rpm: 1450,
-    fuelLevel: 82,
-    backupBatteryPercent: 95,
-    timestamp: new Date().toISOString()
-  },
-  'usr-1_v2': {
-    vehicleId: 'usr-1_v2',
-    topic: 'ibots/tracker/2/location',
-    isOnline: true,
-    status: 'online',
-    gpsValid: true,
-    fix: true,
-    lat: 11.0237,
-    lng: 76.9423,
-    address: 'Saibaba Colony, Coimbatore, Tamil Nadu',
-    street: 'NSR Road',
-    area: 'Saibaba Colony',
-    city: 'Coimbatore',
-    state: 'Tamil Nadu',
-    speed: 42,
-    heading: 180,
-    satellites: 14,
-    rpm: 1800,
-    fuelLevel: 75,
-    backupBatteryPercent: 90,
-    timestamp: new Date().toISOString()
-  },
-  'usr-1_v3': {
-    vehicleId: 'usr-1_v3',
-    topic: 'ibots/tracker/3/location',
-    isOnline: true,
-    status: 'online',
-    gpsValid: true,
-    fix: true,
-    lat: 10.9982,
-    lng: 76.9664,
-    address: 'R.S. Puram, Coimbatore, Tamil Nadu',
-    street: 'DB Road',
-    area: 'R.S. Puram',
-    city: 'Coimbatore',
-    state: 'Tamil Nadu',
-    speed: 0,
-    heading: 0,
-    satellites: 10,
-    rpm: 0,
-    fuelLevel: 60,
-    backupBatteryPercent: 88,
-    timestamp: new Date().toISOString()
-  },
-  '2': {
-    vehicleId: '2',
-    topic: 'ibots/tracker/2/location',
-    isOnline: true,
-    status: 'online',
-    gpsValid: true,
-    fix: true,
-    lat: 11.0237,
-    lng: 76.9423,
-    address: 'Saibaba Colony, Coimbatore, Tamil Nadu',
-    street: 'NSR Road',
-    area: 'Saibaba Colony',
-    city: 'Coimbatore',
-    state: 'Tamil Nadu',
-    speed: 45,
-    heading: 180,
-    satellites: 14,
-    rpm: 1900,
-    fuelLevel: 78,
-    backupBatteryPercent: 92,
-    timestamp: new Date().toISOString()
-  }
-};
-
-let localTelemetryByTopic = {
-  'ibots/tracker/1/location': localTelemetry['usr-1_v1'],
-  'ibots/tracker/2/location': localTelemetry['usr-1_v2'],
-  'ibots/tracker/3/location': localTelemetry['usr-1_v3']
-};
-
-['usr-1_v1', 'usr-1_v2', 'usr-1_v3', '2', 'ibots/tracker/1/location', 'ibots/tracker/2/location', 'ibots/tracker/3/location'].forEach(k => {
-  deviceLastSeen.set(k, initialNow);
-});
-
+let localTelemetry = {};
+let localTelemetryByTopic = {};
 const addressCache = new Map();
 
 // Helper: Reverse Geocode (lat, lng) -> Road, Area, City, State, Full Address
