@@ -1074,9 +1074,11 @@ app.post('/api/webhook/deploy', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MQTT SUBSCRIBER — Captures live ESP32 hardware data from test.mosquitto.org
+// DUAL MQTT BROKER SYSTEM — HiveMQ (Primary) + Eclipse Mosquitto (Fallback)
 // ═══════════════════════════════════════════════════════════════════════════
-const MQTT_BROKER_URL = 'mqtt://test.mosquitto.org:1883';
+const HIVEMQ_PRIMARY_URL = process.env.HIVEMQ_BROKER_URL || 'mqtt://broker.hivemq.com:1883';
+const MOSQUITTO_FALLBACK_URL = process.env.MOSQUITTO_BROKER_URL || 'mqtt://test.mosquitto.org:1883';
+
 const MQTT_TOPICS = [
   'ibots/#',                              // Multi-level wildcard for Quectel EC200U & hardware devices on ibots/
   'ibots/tracker/+/location',
@@ -1085,11 +1087,22 @@ const MQTT_TOPICS = [
   'sedhupathi/+'
 ];
 
-const mqttClient = mqtt.connect(MQTT_BROKER_URL, {
-  clientId: 'ibots-backend-' + Math.random().toString(16).slice(2, 10),
+// HiveMQ Primary Client
+const hivemqClient = mqtt.connect(HIVEMQ_PRIMARY_URL, {
+  clientId: 'ibots-hivemq-' + Math.random().toString(16).slice(2, 10),
   clean: true,
   reconnectPeriod: 5000
 });
+
+// Eclipse Mosquitto Fallback Client
+const mosquittoClient = mqtt.connect(MOSQUITTO_FALLBACK_URL, {
+  clientId: 'ibots-mosquitto-' + Math.random().toString(16).slice(2, 10),
+  clean: true,
+  reconnectPeriod: 5000
+});
+
+// Maintain primary mqttClient reference for backward compatibility
+const mqttClient = hivemqClient;
 
 const DEFAULT_EMERGENCY_NUMBERS = [
   "+919740383725",
@@ -1099,11 +1112,15 @@ const DEFAULT_EMERGENCY_NUMBERS = [
   "+919876543214"
 ];
 
-// 📱 CONTINUOUS RECURRING MQTT SYNC ENGINE
-// Re-broadcasts all configured Emergency Phone Numbers & Config to MQTT every 5s continuously
-function broadcastAllVehicleNumbersMQTT() {
-  if (!mqttClient || !mqttClient.connected) return;
+function safePublishMQTT(client, topic, payload) {
+  if (client && client.connected) {
+    client.publish(topic, payload, { qos: 1, retain: true });
+  }
+}
 
+// 📱 DUAL-BROKER CONTINUOUS RECURRING MQTT SYNC ENGINE
+// Re-broadcasts all configured Emergency Phone Numbers & Config to BOTH HiveMQ & Mosquitto every 5s continuously
+function broadcastAllVehicleNumbersMQTT() {
   const listToSync = (Array.isArray(localVehicles) && localVehicles.length > 0) ? localVehicles : defaultVehicles;
 
   listToSync.forEach(vehicle => {
@@ -1122,41 +1139,56 @@ function broadcastAllVehicleNumbersMQTT() {
       timestamp: new Date().toISOString()
     });
 
-    // Broadcast continuously across all topic variations with retain: true & qos: 1
-    mqttClient.publish(`ibots/tracker/${vId}/number`, payload, { qos: 1, retain: true });
-    mqttClient.publish(`ibots/tracker/${vId}/config`, payload, { qos: 1, retain: true });
-    mqttClient.publish(`sedhupathi/${vId}/number`, payload, { qos: 1, retain: true });
-    mqttClient.publish(`sedhupathi/${vId}/config`, payload, { qos: 1, retain: true });
-    mqttClient.publish(`ibots/${vId}/number`, payload, { qos: 1, retain: true });
+    const targetTopics = [
+      `ibots/tracker/${vId}/number`,
+      `ibots/tracker/${vId}/config`,
+      `sedhupathi/${vId}/number`,
+      `sedhupathi/${vId}/config`,
+      `ibots/${vId}/number`
+    ];
+
+    targetTopics.forEach(top => {
+      safePublishMQTT(hivemqClient, top, payload);
+      safePublishMQTT(mosquittoClient, top, payload);
+    });
   });
 }
 
-// Continuously re-publish emergency numbers every 5 seconds continuously
+// Continuously re-publish emergency numbers every 5 seconds across both brokers
 setInterval(broadcastAllVehicleNumbersMQTT, 5000);
 
-mqttClient.on('connect', () => {
-  console.log('📡 MQTT: Connected to', MQTT_BROKER_URL);
-  MQTT_TOPICS.forEach(topic => {
-    mqttClient.subscribe(topic, (err) => {
-      if (!err) console.log('📡 MQTT: Subscribed to wildcard topic:', topic);
-      else console.warn('📡 MQTT: Subscribe failed for', topic, err.message);
+// Attach Subscriptions & Handlers for HiveMQ Primary & Mosquitto Fallback Brokers
+function setupBroker(client, name, url) {
+  client.on('connect', () => {
+    console.log(`📡 MQTT [${name}]: Connected to ${url}`);
+    MQTT_TOPICS.forEach(topic => {
+      client.subscribe(topic, (err) => {
+        if (!err) console.log(`📡 MQTT [${name}]: Subscribed to wildcard topic: ${topic}`);
+        else console.warn(`📡 MQTT [${name}]: Subscribe failed for ${topic}: ${err.message}`);
+      });
     });
+    broadcastAllVehicleNumbersMQTT();
   });
-  // Immediately sync all emergency phone numbers to MQTT broker on connect
-  broadcastAllVehicleNumbersMQTT();
-});
 
-mqttClient.on('error', (err) => {
-  console.warn('📡 MQTT: Error -', err.message);
-});
+  client.on('error', (err) => {
+    console.warn(`📡 MQTT [${name}]: Connection Warning - ${err.message}`);
+  });
 
-mqttClient.on('reconnect', () => {
-  console.log('📡 MQTT: Reconnecting...');
-  broadcastAllVehicleNumbersMQTT();
-});
+  client.on('reconnect', () => {
+    console.log(`📡 MQTT [${name}]: Reconnecting...`);
+    broadcastAllVehicleNumbersMQTT();
+  });
 
-// Process incoming MQTT messages from ESP32 & Quectel EC200U hardware
-mqttClient.on('message', async (topic, message) => {
+  client.on('message', (topic, message) => {
+    handleIncomingTelemetry(name, topic, message);
+  });
+}
+
+setupBroker(hivemqClient, 'HiveMQ Primary', HIVEMQ_PRIMARY_URL);
+setupBroker(mosquittoClient, 'Mosquitto Fallback', MOSQUITTO_FALLBACK_URL);
+
+// Process incoming MQTT messages from ESP32 & Quectel EC200U hardware across HiveMQ & Mosquitto
+async function handleIncomingTelemetry(brokerName, topic, message) {
   try {
     // Skip backend command/number topics to prevent self-looping
     if (topic.endsWith('/number') || topic.endsWith('/config') || topic.endsWith('/cmd')) {
@@ -1164,7 +1196,7 @@ mqttClient.on('message', async (topic, message) => {
     }
 
     const raw = JSON.parse(message.toString());
-    console.log(`📡 MQTT: Received live telemetry from topic [${topic}]`);
+    console.log(`📡 MQTT [${brokerName}]: Received live telemetry from topic [${topic}]`);
 
     // Extract device/tracker name from topic path: e.g. "ibots/tracker/2/location" -> "2" or "sedhupathi/tracker-01/data" -> "tracker-01"
     const topicParts = topic.split('/');
@@ -1215,6 +1247,7 @@ mqttClient.on('message', async (topic, message) => {
       topic,
       topicDevice: deviceFromTopic,
       vehicleId,
+      broker: brokerName,
       source: 'mqtt_live',
       isOnline: true,
       status: 'online',
@@ -1320,12 +1353,12 @@ mqttClient.on('message', async (topic, message) => {
       console.warn(`Firebase save from MQTT for ${vehicleId} warning:`, fbErr.message);
     }
     
-    console.log(`✅ MQTT Topic [${topic}]: Live location updated (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
+    console.log(`✅ MQTT [${brokerName}] Topic [${topic}]: Live location updated (fix:${hasFix}, lat:${lat}, lng:${lng}, speed:${telemetryDoc.speed})`);
 
   } catch (parseErr) {
-    console.warn('📡 MQTT: Failed to parse message from topic', topic, parseErr.message);
+    console.warn(`📡 MQTT [${brokerName}]: Failed to parse message from topic ${topic}:`, parseErr.message);
   }
-});
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1-HOUR STATIONARY / IDLE ALERT SYSTEM ENGINE
