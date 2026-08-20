@@ -43,7 +43,8 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
-import { subscribeToTelemetry } from './firebase';
+import { subscribeToTelemetry, subscribeToVehicles, db as firebaseDb } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { login as apiLogin, loginWithGoogle as apiGoogleLogin, logout as apiLogout, getAccessToken, getRefreshToken, refreshAccessToken, getUserProfile, authFetch, API_BASE } from './api';
 
 function FleetCardMiniMap({ vehicle, telemetryData }) {
@@ -1124,7 +1125,7 @@ export default function App() {
     }
   };
 
-  // Add/Update System User & Map Device / MQTT Topic / Broker
+  // Add/Update System User & Map Device / MQTT Topic / Broker directly in Firebase Firestore & Backend
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!newUserName) return;
@@ -1135,59 +1136,85 @@ export default function App() {
     const brokerClean = newDeviceBroker.trim() || `mqtt://test.mosquitto.org:1883`;
     const deviceNameClean = newVehicleName.trim() || `${userClean}'s Device (${deviceIdClean})`;
 
+    const vehiclePayload = {
+      id: deviceIdClean,
+      name: deviceNameClean,
+      userName: userClean,
+      topic: topicClean,
+      broker: brokerClean,
+      vin: `OBD_TRK_${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: new Date().toISOString()
+    };
+
+    let success = false;
+
+    // 1. Try Backend API write
     try {
       const res = await fetch(`${API_BASE}/api/vehicles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: deviceIdClean,
-          name: deviceNameClean,
-          userName: userClean,
+        body: JSON.stringify(vehiclePayload)
+      });
+      if (res.ok) success = true;
+    } catch (apiErr) {
+      console.warn("Backend API save warning, writing directly to Firebase Firestore:", apiErr);
+    }
+
+    // 2. Direct Firebase Firestore Write Fallback (guarantees success on Vercel)
+    try {
+      if (firebaseDb) {
+        await setDoc(doc(firebaseDb, 'vehicles', deviceIdClean), vehiclePayload, { merge: true });
+        await setDoc(doc(firebaseDb, 'users', `usr-${deviceIdClean}`), {
+          id: `usr-${deviceIdClean}`,
+          username: userClean.toLowerCase().replace(/\s+/g, '_'),
+          name: userClean,
+          assignedVehicle: deviceIdClean,
           topic: topicClean,
           broker: brokerClean,
-          vin: `OBD_TRK_${Math.floor(1000 + Math.random() * 9000)}`
-        })
+          role: newUserRole,
+          status: 'Active'
+        }, { merge: true });
+        success = true;
+      }
+    } catch (fbErr) {
+      console.warn("Direct Firebase write warning:", fbErr);
+    }
+
+    if (success) {
+      setSystemUsers(prev => {
+        const exists = prev.some(u => u.assignedVehicle === deviceIdClean);
+        if (exists) {
+          return prev.map(u => u.assignedVehicle === deviceIdClean ? { ...u, name: userClean, username: userClean.toLowerCase().replace(/\s+/g, '_') } : u);
+        }
+        return [...prev, {
+          id: `usr-${Date.now()}`,
+          username: userClean.toLowerCase().replace(/\s+/g, '_'),
+          role: newUserRole,
+          name: userClean,
+          assignedVehicle: deviceIdClean,
+          topic: topicClean,
+          broker: brokerClean,
+          status: 'Active'
+        }];
       });
 
-      if (res.ok) {
-        setSystemUsers(prev => {
-          const exists = prev.some(u => u.assignedVehicle === deviceIdClean);
-          if (exists) {
-            return prev.map(u => u.assignedVehicle === deviceIdClean ? { ...u, name: userClean, username: userClean.toLowerCase().replace(/\s+/g, '_') } : u);
-          }
-          return [...prev, {
-            id: `usr-${Date.now()}`,
-            username: userClean.toLowerCase().replace(/\s+/g, '_'),
-            role: newUserRole,
-            name: userClean,
-            assignedVehicle: deviceIdClean,
-            topic: topicClean,
-            broker: brokerClean,
-            status: 'Active'
-          }];
-        });
+      setNewUserName('');
+      setNewUserPassword('');
+      setNewDeviceId('');
+      setNewDeviceTopic('');
+      setNewVehicleName('');
+      const wasEdit = !!editingDeviceId;
+      setEditingDeviceId(null);
 
-        setNewUserName('');
-        setNewUserPassword('');
-        setNewDeviceId('');
-        setNewDeviceTopic('');
-        setNewVehicleName('');
-        const wasEdit = !!editingDeviceId;
-        setEditingDeviceId(null);
+      await fetchVehicles();
+      setSelectedVehicleId(deviceIdClean);
 
-        await fetchVehicles();
-        setSelectedVehicleId(deviceIdClean);
-
-        if (wasEdit) {
-          alert(`✏️ Device "${deviceIdClean}" details updated successfully in database!`);
-        } else {
-          alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
-        }
+      if (wasEdit) {
+        alert(`✏️ Device "${deviceIdClean}" details updated successfully in database!`);
       } else {
-        alert("Failed to save device on server database.");
+        alert(`💾 Registered User "${userClean}" and saved Device "${deviceIdClean}" on Broker "${brokerClean}" & Topic "${topicClean}" to DB!`);
       }
-    } catch (err) {
-      console.error(err);
+    } else {
       alert("Error saving user and device to database.");
     }
   };

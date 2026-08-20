@@ -56,4 +56,30 @@ export function subscribeToTelemetry(onUpdate) {
   }
 }
 
+/**
+ * Subscribe to Fleet Vehicles directly from Firebase Firestore ('vehicles')
+ */
+export function subscribeToVehicles(onUpdate) {
+  try {
+    return onSnapshot(collection(db, 'vehicles'), (snapshot) => {
+      const vehicleList = [];
+      snapshot.forEach((docSnap) => {
+        const vData = docSnap.data();
+        if (vData && vData.id) {
+          vehicleList.push({
+            ...vData,
+            name: vData.name || `Tracker (${vData.id})`
+          });
+        }
+      });
+      onUpdate(vehicleList);
+    }, (error) => {
+      console.warn("Firestore vehicles listener warning:", error.message);
+    });
+  } catch (err) {
+    console.warn("Firebase client vehicles listener error:", err.message);
+    return () => {};
+  }
+}
+
 export default db;
