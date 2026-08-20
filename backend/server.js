@@ -740,16 +740,20 @@ app.post('/api/telemetry', async (req, res) => {
   }
 });
 
-// 2. Fetch Fleet Vehicles — Reads from MongoDB and computes dynamic hardware online/offline status
+// 2. Fetch Fleet Vehicles — Powered EXCLUSIVELY by Firebase DB (Firestore 'vehicles')
 app.get('/api/vehicles', async (req, res) => {
   let fetchedVehicles = [];
   try {
-    const mongoVehicles = await Vehicle.find({}).lean();
-    if (mongoVehicles && mongoVehicles.length > 0) {
-      fetchedVehicles = mongoVehicles;
+    if (db) {
+      const querySnapshot = await getDocs(collection(db, 'vehicles'));
+      const fbVehicles = [];
+      querySnapshot.forEach(docSnap => fbVehicles.push(docSnap.data()));
+      if (fbVehicles.length > 0) {
+        fetchedVehicles = fbVehicles;
+      }
     }
-  } catch (mongoErr) {
-    console.warn("⚠️ MongoDB fetch vehicles warning:", mongoErr.message);
+  } catch (fbErr) {
+    console.warn("⚠️ Firebase Firestore fetch vehicles warning:", fbErr.message);
   }
 
   if (fetchedVehicles.length === 0) {
@@ -1502,30 +1506,13 @@ function extractVehicleId(req) {
   return decodeURIComponent(raw).trim();
 }
 
-// REST APIs for Route History Replay — Powered by MongoDB
+// REST APIs for Route History Replay — Powered EXCLUSIVELY by Firebase DB (Firestore 'telemetry_history')
 app.get('/api/history/:vehicleId', async (req, res) => {
   try {
     const targetId = extractVehicleId(req);
     const { startDate, endDate } = req.query;
-
-    // Build MongoDB query
-    const mongoQuery = { vehicleId: targetId };
-    if (startDate || endDate) {
-      mongoQuery.timestamp = {};
-      if (startDate) mongoQuery.timestamp.$gte = new Date(startDate);
-      if (endDate) mongoQuery.timestamp.$lte = new Date(endDate);
-    }
-
-    try {
-      const mongoPoints = await TelemetryHistory.find(mongoQuery).sort({ timestamp: 1 }).lean();
-      if (mongoPoints && mongoPoints.length > 0) {
-        return res.json(mongoPoints);
-      }
-    } catch (mongoErr) {
-      console.warn("⚠️ MongoDB history fetch warning:", mongoErr.message);
-    }
-
     const points = [];
+
     if (db) {
       const snapshot = await getDocs(collection(db, 'telemetry_history'));
       snapshot.forEach(docSnap => {
