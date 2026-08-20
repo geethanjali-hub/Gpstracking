@@ -811,14 +811,36 @@ app.post('/api/vehicles', async (req, res) => {
       localVehicles.push(vehicleData);
     }
 
-    // Write directly to Firebase Firestore Cloud Database ('vehicles')
+    // Write directly to Firebase Firestore & Realtime DB ('vehicles' and 'users' collections)
     try {
       if (db) {
-        await setDoc(doc(db, 'vehicles', vId), vehicleData);
+        await setDoc(doc(db, 'vehicles', vId), vehicleData, { merge: true });
+        
+        // Also save user profile if userName provided
+        if (newVehicle.userName) {
+          const userObj = {
+            id: `usr-${vId}`,
+            username: newVehicle.userName.toLowerCase().replace(/\s+/g, '_'),
+            name: newVehicle.userName,
+            assignedVehicle: vId,
+            topic: vehicleData.topic,
+            broker: vehicleData.broker,
+            role: newVehicle.userRole || 'operator',
+            status: 'Active',
+            createdAt: new Date().toISOString()
+          };
+          await setDoc(doc(db, 'users', `usr-${vId}`), userObj, { merge: true }).catch(() => {});
+          if (rtdb) {
+            set(ref(rtdb, 'users/' + `usr-${vId}`), userObj).catch(() => {});
+          }
+        }
       }
-      console.log(`✅ Saved vehicle ${vId} (alert_status: ${smsAlertStatus}) with ${phoneNumbers.length} emergency phone numbers directly to Firebase Firestore ('vehicles')`);
+      if (rtdb) {
+        set(ref(rtdb, 'vehicles/' + vId), vehicleData).catch(() => {});
+      }
+      console.log(`✅ Saved vehicle ${vId} & user directly to Firebase Firestore & Realtime DB ('ibots-gps')`);
     } catch (fbErr) {
-      console.warn("⚠️ Firebase Firestore write warning:", fbErr.message);
+      console.warn("⚠️ Firebase write warning:", fbErr.message);
     }
 
     // Backup to local DB file
@@ -871,6 +893,51 @@ app.post('/api/vehicles', async (req, res) => {
 
     broadcast({ type: 'VEHICLE_ADDED', data: vehicleData });
     res.status(201).json(vehicleData);
+  } catch (err) {
+    console.error("❌ Add vehicle error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Register / Save System User directly in Firebase Firestore ('users') & Realtime DB
+app.post('/api/users', async (req, res) => {
+  try {
+    const userObj = req.body;
+    const userId = userObj.id || `usr-${Date.now()}`;
+    const cleanUser = {
+      id: userId,
+      name: userObj.name || userObj.username || 'User',
+      username: (userObj.username || userObj.name || '').toLowerCase().replace(/\s+/g, '_'),
+      role: userObj.role || 'operator',
+      assignedVehicle: userObj.assignedVehicle || '',
+      topic: userObj.topic || '',
+      broker: userObj.broker || '',
+      status: 'Active',
+      createdAt: new Date().toISOString()
+    };
+
+    if (db) {
+      await setDoc(doc(db, 'users', userId), cleanUser, { merge: true }).catch(() => {});
+    }
+    if (rtdb) {
+      set(ref(rtdb, 'users/' + userId), cleanUser).catch(() => {});
+    }
+    res.status(201).json(cleanUser);
+  } catch (err) {
+    console.error("❌ Save user error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get System Users directly from Firebase Firestore ('users')
+app.get('/api/users', async (req, res) => {
+  try {
+    const usersList = [];
+    if (db) {
+      const snapshot = await getDocs(collection(db, 'users'));
+      snapshot.forEach(docSnap => usersList.push(docSnap.data()));
+    }
+    res.json(usersList);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
