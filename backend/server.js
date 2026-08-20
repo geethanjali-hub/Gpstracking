@@ -580,35 +580,19 @@ app.get('/api/telemetry', (req, res) => {
   const queryTopic = req.query.topic;
   if (queryTopic) {
     const data = localTelemetryByTopic[queryTopic] || Object.values(localTelemetry).find(t => t.topic === queryTopic);
-    return res.json(data || { error: 'No telemetry found for specified topic', topic: queryTopic });
+    return res.json(data || { error: 'No live hardware telemetry found for specified topic', topic: queryTopic });
   }
 
-  // Build merged map: registered vehicles + live MQTT data
-  // Devices that have NEVER received an MQTT packet are shown as OFFLINE with null location
-  const activeVehicles = Array.isArray(localVehicles) ? localVehicles : [];
-  const mergedTelemetry = {};
-  activeVehicles.forEach(v => {
-    const live = localTelemetry[v.id] || localTelemetryByTopic[v.topic];
-    if (live) {
-      mergedTelemetry[v.id] = live;
-    } else {
-      // No MQTT packet ever received — mark strictly as OFFLINE with no location
-      mergedTelemetry[v.id] = {
-        vehicleId: v.id,
-        vehicleName: v.name,
-        topic: v.topic,
-        isOnline: false,
-        status: 'offline',
-        lat: null,
-        lng: null,
-        address: 'No Signal — Device Offline',
-        speed: 0,
-        satellites: 0,
-        lastSeen: null
-      };
+  // Return EXCLUSIVELY telemetry from devices that have received real hardware MQTT packets
+  const realHardwareTelemetry = {};
+  Object.keys(localTelemetry).forEach(vId => {
+    const item = localTelemetry[vId];
+    if (item && item.lat !== null && item.lat !== undefined) {
+      realHardwareTelemetry[vId] = item;
     }
   });
-  res.json(mergedTelemetry);
+
+  res.json(realHardwareTelemetry);
 });
 
 app.get('/api/telemetry/by-topic', (req, res) => {
