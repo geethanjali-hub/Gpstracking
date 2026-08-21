@@ -414,6 +414,8 @@ export default function App() {
   const [vehicles, setVehicles] = useState([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [telemetry, setTelemetry] = useState({});
+  const telemetryRef = useRef(telemetry);
+  useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
   const [alerts, setAlerts] = useState([]);
   const [routes, setRoutes] = useState({});
   const [geofences, setGeofences] = useState({});
@@ -1320,26 +1322,12 @@ export default function App() {
     });
   };
 
-  // Firebase Real-Time Listeners for Vehicles & Telemetry
+  // Firebase Real-Time Listeners for Vehicles & Telemetry (Mounts once, never re-triggers)
   useEffect(() => {
     const unsubVehicles = subscribeToVehicles((fbVehicles) => {
       if (Array.isArray(fbVehicles) && fbVehicles.length > 0) {
-        console.log(`🔥 Firebase Vehicles loaded ${fbVehicles.length} devices:`, fbVehicles);
-        
-        const now = Date.now();
-        const evaluatedVehicles = fbVehicles.map(v => {
-          const t = telemetry[v.id] || {};
-          const tTime = t.timestamp ? new Date(t.timestamp).getTime() : 0;
-          const isOnline = (now - tTime) <= 15000 && tTime > 0;
-          return {
-            ...v,
-            status: isOnline ? 'online' : 'offline',
-            isOnline
-          };
-        });
-
-        setVehicles(evaluatedVehicles);
-        setSelectedVehicleId(prev => (prev && evaluatedVehicles.some(v => v.id === prev)) ? prev : evaluatedVehicles[0].id);
+        setVehicles(fbVehicles);
+        setSelectedVehicleId(prev => (prev && fbVehicles.some(v => v.id === prev)) ? prev : fbVehicles[0].id);
       }
     });
 
@@ -1355,9 +1343,9 @@ export default function App() {
       if (typeof unsubVehicles === 'function') unsubVehicles();
       if (typeof unsubTelemetry === 'function') unsubTelemetry();
     };
-  }, [telemetry]);
+  }, []);
 
-  // Periodic 3-second Liveness Evaluation (Strictly switches device to OFFLINE if no MQTT packet in 15s)
+  // Periodic 5-second Liveness Evaluation (Runs smoothly without re-registering listeners)
   useEffect(() => {
     const livenessTimer = setInterval(() => {
       const now = Date.now();
@@ -1365,7 +1353,7 @@ export default function App() {
         if (!prevVehicles || prevVehicles.length === 0) return prevVehicles;
         let changed = false;
         const updated = prevVehicles.map(v => {
-          const t = telemetry[v.id] || {};
+          const t = telemetryRef.current[v.id] || {};
           const tTime = t.timestamp ? new Date(t.timestamp).getTime() : 0;
           const isOnline = (now - tTime) <= 15000 && tTime > 0;
           if (v.isOnline !== isOnline) {
@@ -1380,10 +1368,10 @@ export default function App() {
         });
         return changed ? updated : prevVehicles;
       });
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(livenessTimer);
-  }, [telemetry]);
+  }, []);
 
   // WebSockets setup for live hardware telemetry
   useEffect(() => {
