@@ -744,8 +744,20 @@ app.get('/api/vehicles', async (req, res) => {
     console.warn("⚠️ Firebase Firestore fetch vehicles warning:", fbErr.message);
   }
 
-  if (fetchedVehicles.length === 0) {
+  if (fetchedVehicles.length === 0 && localVehicles.length > 0) {
     fetchedVehicles = localVehicles;
+    // Auto-sync local vehicles to Firebase Firestore so Vercel & DigitalOcean match 100%
+    try {
+      if (db) {
+        for (const v of localVehicles) {
+          if (v && v.id) {
+            await setDoc(doc(db, 'vehicles', v.id), v, { merge: true }).catch(() => {});
+          }
+        }
+      }
+    } catch (sErr) {
+      console.warn("Firebase auto-sync warning:", sErr.message);
+    }
   }
 
   // Strictly compute dynamic online/offline status based on real-time hardware MQTT packet timestamps
