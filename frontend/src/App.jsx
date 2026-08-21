@@ -1299,8 +1299,16 @@ export default function App() {
   };
 
   // Helper to deduplicate telemetry updates and prevent UI blinking
-  const applyTelemetryUpdate = (vid, data) => {
-    if (!vid || !data) return;
+  const applyTelemetryUpdate = (vid, rawData) => {
+    if (!vid || !rawData) return;
+    const powerObj = rawData.power || {};
+    const data = {
+      ...rawData,
+      obdConnected: rawData.obdConnected ?? powerObj.obd_connected ?? (rawData.powerSource === 'main'),
+      battery_pct: rawData.backupBatteryPercent ?? powerObj.battery_pct ?? rawData.battery_pct ?? 0,
+      backupBatteryPercent: rawData.backupBatteryPercent ?? powerObj.battery_pct ?? rawData.battery_pct ?? 0,
+      isCharging: rawData.isCharging ?? powerObj.charging ?? false
+    };
     setTelemetry(prev => {
       const existing = prev[vid];
       if (existing &&
@@ -1312,6 +1320,9 @@ export default function App() {
           existing.isOnline === data.isOnline &&
           existing.rpm === data.rpm &&
           existing.fuelLevel === data.fuelLevel &&
+          existing.backupBatteryPercent === data.backupBatteryPercent &&
+          existing.obdConnected === data.obdConnected &&
+          existing.isCharging === data.isCharging &&
           existing.satellites === data.satellites) {
         return prev; // Skip state change if telemetry hasn't changed
       }
