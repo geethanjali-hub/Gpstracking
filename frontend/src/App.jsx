@@ -1302,8 +1302,14 @@ export default function App() {
   const applyTelemetryUpdate = (vid, rawData) => {
     if (!vid || !rawData) return;
     const powerObj = rawData.power || {};
+    const now = Date.now();
+    const tTime = rawData.timestamp ? new Date(rawData.timestamp).getTime() : 0;
+    const isOnline = (now - tTime) <= 15000 && tTime > 0;
+
     const data = {
       ...rawData,
+      isOnline,
+      status: isOnline ? 'online' : 'offline',
       obdConnected: rawData.obdConnected ?? powerObj.obd_connected ?? (rawData.powerSource === 'main'),
       battery_pct: rawData.backupBatteryPercent ?? powerObj.battery_pct ?? rawData.battery_pct ?? 0,
       backupBatteryPercent: rawData.backupBatteryPercent ?? powerObj.battery_pct ?? rawData.battery_pct ?? 0,
