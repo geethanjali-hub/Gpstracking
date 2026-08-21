@@ -1318,15 +1318,16 @@ async function handleIncomingTelemetry(brokerName, topic, message) {
       v.id === topicParts[1] ||
       (v.topic && v.topic.includes(deviceFromTopic))
     );
-    const vehicleId = matchedVehicle ? matchedVehicle.id : deviceFromTopic;
+    const trackerIdFromPayload = raw.tracker_id || raw.device_id || raw.vehicleId;
+    const vehicleId = matchedVehicle ? matchedVehicle.id : (trackerIdFromPayload || deviceFromTopic);
 
     // Pure Dynamic Registration: Automatically register new hardware tracker on MQTT message if not existing
     if (!matchedVehicle && vehicleId) {
       const newDynamicVehicle = {
         id: vehicleId,
-        name: `Tracker ${deviceFromTopic}`,
-        userName: 'Dynamic Device',
-        vin: `IBOTS-${deviceFromTopic.toUpperCase()}-2026`,
+        name: `Tracker ${vehicleId}`,
+        userName: 'Hardware Device',
+        vin: `IBOTS-${String(vehicleId).toUpperCase()}-2026`,
         status: 'online',
         topic: topic,
         broker: brokerName,
@@ -1345,8 +1346,9 @@ async function handleIncomingTelemetry(brokerName, topic, message) {
     const outerLoc = raw.location || raw;
     const innerLoc = (typeof outerLoc.location === 'object' && outerLoc.location !== null) ? outerLoc.location : outerLoc;
 
-    const engineObj = outerLoc.engine || raw.engine || {};
-    const fuelObj = outerLoc.fuel || raw.fuel || {};
+    const engineObj = raw.engine || outerLoc.engine || raw.obd || {};
+    const fuelObj = raw.fuel || outerLoc.fuel || {};
+    const powerObj = raw.power || outerLoc.power || {};
 
     const rawLat = innerLoc?.lat ?? outerLoc?.lat ?? raw.lat;
     const rawLng = innerLoc?.lng ?? outerLoc?.lng ?? raw.lng;
@@ -1393,11 +1395,13 @@ async function handleIncomingTelemetry(brokerName, topic, message) {
       hdop: innerLoc?.hdop ?? outerLoc?.hdop ?? 0,
       accuracy: innerLoc?.hdop ?? 2.5,
 
-      // OBD & Diagnostics Data (Quectel EC200U & ESP32)
+      // OBD, Engine & Power Data (Quectel EC200U & ESP32)
       rpm: engineObj?.rpm ?? raw.rpm ?? 0,
       coolantTemp: engineObj?.coolant_temp_c ?? raw.coolant_c ?? 0,
-      fuelLevel: fuelObj?.fuel_level_pct ?? raw.fuel_pct ?? 0,
-      backupBatteryPercent: raw.battery?.battery_pct ?? raw.bat_pct ?? 100,
+      fuelLevel: engineObj?.fuel_level_pct ?? fuelObj?.fuel_level_pct ?? raw.fuel_pct ?? 0,
+      backupBatteryPercent: powerObj?.battery_pct ?? raw.battery?.battery_pct ?? raw.bat_pct ?? 0,
+      powerSource: powerObj?.obd_connected ? 'main' : 'backup',
+      isCharging: powerObj?.charging ?? false,
 
       timestamp: new Date().toISOString()
     };
