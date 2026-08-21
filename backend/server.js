@@ -1061,14 +1061,19 @@ app.delete('/api/telemetry', async (req, res) => {
     try {
       if (rtdb) {
         await set(ref(rtdb, 'telemetry'), null);
+        await set(ref(rtdb, 'telemetry_history'), null);
       }
       if (db) {
-        const snapshot = await getDocs(collection(db, 'telemetry'));
+        const snapshot = await getDocs(collection(db, 'telemetry')).catch(() => ({ docs: [] }));
         for (const docSnap of snapshot.docs) {
-          await deleteDoc(doc(db, 'telemetry', docSnap.id));
+          await deleteDoc(doc(db, 'telemetry', docSnap.id)).catch(() => {});
+        }
+        const histSnapshot = await getDocs(collection(db, 'telemetry_history')).catch(() => ({ docs: [] }));
+        for (const docSnap of histSnapshot.docs) {
+          await deleteDoc(doc(db, 'telemetry_history', docSnap.id)).catch(() => {});
         }
       }
-      console.log('🗑️ Deleted all vehicle telemetry data from Firebase DB (ibots-gps)');
+      console.log('🗑️ Deleted all vehicle telemetry & telemetry_history data from Firebase DB (ibots-gps)');
     } catch (fbErr) {
       console.warn('⚠️ Firebase telemetry delete warning:', fbErr.message);
     }
