@@ -2457,9 +2457,11 @@ export default function App() {
                             <div><strong>Tracker ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.id}</span></div>
                             <div><strong>Assigned Driver:</strong> {v.userName || 'Unassigned'}</div>
                             <div><strong>VIN:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{v.vin}</span></div>
+                            <div><strong>OBD Power:</strong> <span style={{ color: tData.powerSource === 'main' ? '#10b981' : '#f59e0b', fontWeight: 700 }}>{tData.powerSource === 'main' ? '🔌 Connected (Main OBD 12V)' : '🔋 Disconnected (Internal Battery)'}</span></div>
+                            <div><strong>Backup Battery:</strong> <span style={{ color: (tData.backupBatteryPercent || 0) > 50 ? '#10b981' : '#f59e0b', fontWeight: 700 }}>{tData.backupBatteryPercent ?? 0}%</span></div>
+                            <div><strong>Charging:</strong> <span style={{ color: tData.isCharging ? '#10b981' : 'var(--text-secondary)', fontWeight: 700 }}>{tData.isCharging ? '⚡ Charging Active' : '🔋 On Battery Power'}</span></div>
                             <div><strong>Coordinates:</strong> {!isOff && typeof tData.lat === 'number' && typeof tData.lng === 'number' ? `${tData.lat.toFixed(5)}, ${tData.lng.toFixed(5)}` : 'Offline'}</div>
                             <div><strong>Address:</strong> <span style={{ color: isOff ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 600 }}>{isOff ? 'Offline' : (tData.address || 'Locating...')}</span></div>
-                            <div><strong>Backup Battery:</strong> <span style={{ color: '#10b981', fontWeight: 700 }}>{tData.backupBatteryPercent || 100}%</span></div>
                           </div>
 
                           <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
@@ -2593,6 +2595,27 @@ export default function App() {
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>GPS Accuracy</span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>±{currentData.accuracy || 2.5} m</span>
+                    </div>
+
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🔌 OBD Power Connection</span>
+                      <strong style={{ fontSize: '0.72rem', color: currentData.powerSource === 'main' ? '#10b981' : '#f59e0b' }}>
+                        {currentData.powerSource === 'main' ? '🔌 Connected (Main OBD 12V)' : '🔋 Disconnected (Internal Battery)'}
+                      </strong>
+                    </div>
+
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🔋 Backup Battery Level</span>
+                      <strong style={{ fontSize: '0.72rem', color: (currentData.backupBatteryPercent || 0) > 50 ? '#10b981' : (currentData.backupBatteryPercent || 0) > 20 ? '#f59e0b' : '#ef4444' }}>
+                        {currentData.backupBatteryPercent ?? 0}%
+                      </strong>
+                    </div>
+
+                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>⚡ Charging Status</span>
+                      <strong style={{ fontSize: '0.72rem', color: currentData.isCharging ? '#10b981' : 'var(--text-secondary)' }}>
+                        {currentData.isCharging ? '⚡ Charging Active' : '🔋 Discharging / On Battery'}
+                      </strong>
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
