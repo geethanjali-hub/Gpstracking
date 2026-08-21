@@ -57,11 +57,41 @@ export function subscribeToTelemetry(onUpdate) {
 }
 
 /**
- * Subscribe to Fleet Vehicles directly from Firebase Firestore ('vehicles')
+ * Subscribe to Fleet Vehicles directly from Firebase Realtime DB & Firestore ('vehicles')
  */
 export function subscribeToVehicles(onUpdate) {
   try {
-    return onSnapshot(collection(db, 'vehicles'), (snapshot) => {
+    // 1. Try Realtime Database (RTDB) listener (Bypasses Firestore quota limits)
+    const rtdbRef = ref(rtdb, 'vehicles');
+    const unsubRtdb = onValue(rtdbRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const raw = snapshot.val();
+        const vehicleList = [];
+        if (Array.isArray(raw)) {
+          raw.forEach(v => v && v.id && vehicleList.push(v));
+        } else if (typeof raw === 'object') {
+          Object.keys(raw).forEach(key => {
+            const vData = raw[key];
+            if (vData) {
+              vehicleList.push({
+                ...vData,
+                id: vData.id || key,
+                name: vData.name || `Tracker (${key})`
+              });
+            }
+          });
+        }
+        if (vehicleList.length > 0) {
+          console.log(`⚡ Realtime DB (RTDB) 'vehicles' listener loaded ${vehicleList.length} devices`);
+          onUpdate(vehicleList);
+        }
+      }
+    }, (error) => {
+      console.warn("RTDB vehicles listener fallback:", error.message);
+    });
+
+    // 2. Try Firestore listener (when within quota)
+    const unsubFs = onSnapshot(collection(db, 'vehicles'), (snapshot) => {
       const vehicleList = [];
       snapshot.forEach((docSnap) => {
         const vData = docSnap.data() || {};
@@ -74,11 +104,18 @@ export function subscribeToVehicles(onUpdate) {
           });
         }
       });
-      console.log(`🔥 Firestore 'vehicles' listener loaded ${vehicleList.length} devices`);
-      onUpdate(vehicleList);
+      if (vehicleList.length > 0) {
+        console.log(`🔥 Firestore 'vehicles' listener loaded ${vehicleList.length} devices`);
+        onUpdate(vehicleList);
+      }
     }, (error) => {
-      console.warn("Firestore vehicles listener warning:", error.message);
+      console.warn("Firestore vehicles listener quota warning:", error.message);
     });
+
+    return () => {
+      unsubRtdb();
+      unsubFs();
+    };
   } catch (err) {
     console.warn("Firebase client vehicles listener error:", err.message);
     return () => {};

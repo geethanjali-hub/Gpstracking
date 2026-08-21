@@ -1325,8 +1325,21 @@ export default function App() {
     const unsubVehicles = subscribeToVehicles((fbVehicles) => {
       if (Array.isArray(fbVehicles) && fbVehicles.length > 0) {
         console.log(`🔥 Firebase Vehicles loaded ${fbVehicles.length} devices:`, fbVehicles);
-        setVehicles(fbVehicles);
-        setSelectedVehicleId(prev => (prev && fbVehicles.some(v => v.id === prev)) ? prev : fbVehicles[0].id);
+        
+        const now = Date.now();
+        const evaluatedVehicles = fbVehicles.map(v => {
+          const t = telemetry[v.id] || {};
+          const tTime = t.timestamp ? new Date(t.timestamp).getTime() : 0;
+          const isOnline = (now - tTime) <= 15000 && tTime > 0;
+          return {
+            ...v,
+            status: isOnline ? 'online' : 'offline',
+            isOnline
+          };
+        });
+
+        setVehicles(evaluatedVehicles);
+        setSelectedVehicleId(prev => (prev && evaluatedVehicles.some(v => v.id === prev)) ? prev : evaluatedVehicles[0].id);
       }
     });
 
@@ -1342,7 +1355,35 @@ export default function App() {
       if (typeof unsubVehicles === 'function') unsubVehicles();
       if (typeof unsubTelemetry === 'function') unsubTelemetry();
     };
-  }, []);
+  }, [telemetry]);
+
+  // Periodic 3-second Liveness Evaluation (Strictly switches device to OFFLINE if no MQTT packet in 15s)
+  useEffect(() => {
+    const livenessTimer = setInterval(() => {
+      const now = Date.now();
+      setVehicles(prevVehicles => {
+        if (!prevVehicles || prevVehicles.length === 0) return prevVehicles;
+        let changed = false;
+        const updated = prevVehicles.map(v => {
+          const t = telemetry[v.id] || {};
+          const tTime = t.timestamp ? new Date(t.timestamp).getTime() : 0;
+          const isOnline = (now - tTime) <= 15000 && tTime > 0;
+          if (v.isOnline !== isOnline) {
+            changed = true;
+            return {
+              ...v,
+              status: isOnline ? 'online' : 'offline',
+              isOnline
+            };
+          }
+          return v;
+        });
+        return changed ? updated : prevVehicles;
+      });
+    }, 3000);
+
+    return () => clearInterval(livenessTimer);
+  }, [telemetry]);
 
   // WebSockets setup for live hardware telemetry
   useEffect(() => {

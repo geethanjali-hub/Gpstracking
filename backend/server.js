@@ -741,7 +741,22 @@ app.get('/api/vehicles', async (req, res) => {
       }
     }
   } catch (fbErr) {
-    console.warn("⚠️ Firebase Firestore fetch vehicles warning:", fbErr.message);
+    console.warn("⚠️ Firebase Firestore fetch vehicles warning (quota/network):", fbErr.message);
+  }
+
+  // Fallback to Realtime DB if Firestore is over daily quota
+  if (fetchedVehicles.length === 0 && rtdb) {
+    try {
+      const snap = await get(child(ref(rtdb), 'vehicles'));
+      if (snap.exists()) {
+        const rtdbVal = snap.val();
+        if (typeof rtdbVal === 'object') {
+          fetchedVehicles = Object.values(rtdbVal).filter(Boolean);
+        }
+      }
+    } catch (rtdbErr) {
+      console.warn("⚠️ RTDB vehicles fallback warning:", rtdbErr.message);
+    }
   }
 
   if (fetchedVehicles.length === 0 && localVehicles.length > 0) {
