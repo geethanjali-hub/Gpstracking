@@ -1337,8 +1337,19 @@ export default function App() {
   useEffect(() => {
     const unsubVehicles = subscribeToVehicles((fbVehicles) => {
       if (Array.isArray(fbVehicles) && fbVehicles.length > 0) {
-        setVehicles(fbVehicles);
-        setSelectedVehicleId(prev => (prev && fbVehicles.some(v => v.id === prev)) ? prev : fbVehicles[0].id);
+        const now = Date.now();
+        const evaluatedVehicles = fbVehicles.map(v => {
+          const t = telemetryRef.current[v.id] || {};
+          const tTime = t.timestamp ? new Date(t.timestamp).getTime() : 0;
+          const isOnline = (now - tTime) <= 15000 && tTime > 0;
+          return {
+            ...v,
+            status: isOnline ? 'online' : 'offline',
+            isOnline
+          };
+        });
+        setVehicles(evaluatedVehicles);
+        setSelectedVehicleId(prev => (prev && evaluatedVehicles.some(v => v.id === prev)) ? prev : evaluatedVehicles[0].id);
       }
     });
 
