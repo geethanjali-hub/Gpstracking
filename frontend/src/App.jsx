@@ -1566,10 +1566,10 @@ export default function App() {
 
           devicesWithCoords.push([finalLat, finalLng]);
 
-          // Status color matching table exactly: Green = Moving, Amber = Parked/Idle, Red = Offline
-          const statusColor = !isOnline ? '#ef4444' : (isMoving ? '#10b981' : '#f59e0b');
-          const statusSymbol = !isOnline ? '🔴' : (isMoving ? '🟢' : '🟡');
-          const statusLabel = !isOnline ? 'OFFLINE' : (isMoving ? `MOVING (${numSpeed.toFixed(1)} km/h)` : 'PARKED / IDLE');
+          // Status color matching: Green = ONLINE, Red = OFFLINE
+          const statusColor = isOnline ? '#10b981' : '#ef4444';
+          const statusSymbol = isOnline ? '🟢' : '🔴';
+          const statusLabel = isOnline ? (isMoving ? `ONLINE - MOVING (${numSpeed.toFixed(1)} km/h)` : 'ONLINE - PARKED / IDLE') : 'OFFLINE';
 
           const icon = L.divIcon({
             html: `
@@ -2438,19 +2438,19 @@ export default function App() {
                                   ) : (
                                     <span
                                       style={{
-                                        backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                                        color: '#d97706',
+                                        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                                        color: '#22c55e',
                                         fontWeight: 800,
                                         padding: '3px 8px',
                                         borderRadius: '4px',
-                                        border: '1px solid #d97706',
+                                        border: '1px solid #22c55e',
                                         fontSize: '0.7rem',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '4px'
                                       }}
                                     >
-                                      🟡 PARKED / IDLE
+                                      🟢 ONLINE (IDLE)
                                     </span>
                                   )}
                                 </td>
