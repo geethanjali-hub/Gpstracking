@@ -30,7 +30,9 @@ import {
   Menu,
   X,
   Pencil,
-  Truck
+  Truck,
+  ParkingCircle,
+  Crosshair
 } from 'lucide-react';
 import Chart from 'chart.js/auto';
 import L from 'leaflet';
@@ -305,7 +307,12 @@ function RouteHistoryMapComponent({ historyTrail, selectedVehicle }) {
     const container = mapContainerRef.current;
     if (container._leaflet_id) delete container._leaflet_id;
 
-    const validCoords = (historyTrail || []).filter(p => p && typeof p.lat === 'number' && typeof p.lng === 'number' && !isNaN(p.lat) && !isNaN(p.lng) && p.lat !== 0 && p.lng !== 0 && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
+    const validCoords = (historyTrail || []).filter(p => 
+      p && typeof p.lat === 'number' && typeof p.lng === 'number' &&
+      !isNaN(p.lat) && !isNaN(p.lng) &&
+      p.lat !== 0 && p.lng !== 0 &&
+      p.lat >= 6.0 && p.lat <= 38.0 && p.lng >= 68.0 && p.lng <= 98.0
+    );
     const centerCoords = validCoords.length > 0
       ? [validCoords[0].lat, validCoords[0].lng]
       : [11.02366, 76.9424];
@@ -1533,16 +1540,15 @@ export default function App() {
           const t = telemetry[v.id] || telemetry[v.topic] || Object.values(telemetry).find(x => x.vehicleId === v.id || x.topic === v.topic) || {};
           const hasValidCoords = typeof t.lat === 'number' && typeof t.lng === 'number' && !isNaN(t.lat) && !isNaN(t.lng) && t.lat !== 0 && t.lng !== 0;
           const isOnline = t.isOnline === true && hasValidCoords;
+
+          // Only plot active online devices with valid GPS coordinates (Do not plot offline fallback pins)
+          if (!isOnline) return;
+
           const numSpeed = typeof t.speed === 'number' ? t.speed : parseFloat(t.speed) || 0;
           const isMoving = isOnline && numSpeed > 0;
           
-          let rawLat = hasValidCoords ? t.lat : null;
-          let rawLng = hasValidCoords ? t.lng : null;
-          if (!isOnline || rawLat === null || rawLng === null) {
-            const fb = fallbackCoords[idx % fallbackCoords.length];
-            rawLat = fb[0];
-            rawLng = fb[1];
-          }
+          let rawLat = t.lat;
+          let rawLng = t.lng;
 
           // Apply visual offset if multiple markers land on the exact same lat/lng spot
           const key = `${rawLat.toFixed(3)}_${rawLng.toFixed(3)}`;
@@ -2162,20 +2168,25 @@ export default function App() {
                 </select>
               </div>
             )}
-            <span className={`role-badge ${role}`}>{role.toUpperCase()} PROFILE</span>
           </div>
         </header>
 
         <div className="module-view">
           
-          {/* Critical notification bar */}
-          {alerts.filter(a => a.severity === 'critical').slice(0, 1).map(alert => (
-            <div key={alert.id} className="alert-banner critical" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Critical notification bar (Auto-dismiss / Short format) */}
+          {alerts.filter(a => a.severity === 'critical' && !a.dismissed).slice(0, 1).map(alert => (
+            <div key={alert.id} className="alert-banner critical" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', padding: '0.65rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.5rem 0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertOctagon size={16} className="blink-dot" style={{ color: 'var(--accent-red)' }} />
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>[ALARM SYSTEM TRIGGERED] {alert.message}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-red)' }}>[ALARM SYSTEM TRIGGERED]</span>
               </div>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(alert.timestamp).toLocaleTimeString()}</span>
+              <button
+                onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, dismissed: true } : a))}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                aria-label="Dismiss Alarm"
+              >
+                <X size={16} />
+              </button>
             </div>
           ))}
 
@@ -2184,7 +2195,7 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
               {/* SECTION A: FLEET-WIDE EXECUTIVE SUMMARY CARDS (Clickable Filters) */}
-              <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem' }}>
+              <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
                 
                 <div
                   onClick={() => setStatusFilter('all')}
@@ -2197,9 +2208,12 @@ export default function App() {
                   }}
                 >
                   <div className="metric-card-details">
-                    <span className="metric-card-title">Total Fleet</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: 'var(--accent-cyan)' }}>{vehicles.length}</span>
-                    <span className="metric-card-desc">Click to show all ({vehicles.length})</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Truck size={16} style={{ color: 'var(--accent-cyan)' }} />
+                      <span className="metric-card-title">Total Fleet</span>
+                    </div>
+                    <span className="metric-card-value" style={{ color: 'var(--accent-cyan)' }}>{vehicles.length}</span>
+                    <span className="metric-card-sub text-muted" style={{ fontSize: '0.65rem' }}>Click to show all ({vehicles.length})</span>
                   </div>
                 </div>
 
@@ -2214,11 +2228,14 @@ export default function App() {
                   }}
                 >
                   <div className="metric-card-details">
-                    <span className="metric-card-title">Active / Moving</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: 'var(--accent-green)' }}>
-                      {vehicles.filter(v => (telemetry[v.id]?.speed || 0) > 0).length}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Activity size={16} style={{ color: 'var(--accent-green)' }} />
+                      <span className="metric-card-title">Active / Moving</span>
+                    </div>
+                    <span className="metric-card-value" style={{ color: 'var(--accent-green)' }}>
+                      {vehicles.filter(v => telemetry[v.id]?.isOnline === true && (telemetry[v.id]?.speed || 0) > 1).length}
                     </span>
-                    <span className="metric-card-desc">Click to filter active</span>
+                    <span className="metric-card-sub text-muted" style={{ fontSize: '0.65rem' }}>Click to filter active</span>
                   </div>
                 </div>
 
@@ -2226,18 +2243,21 @@ export default function App() {
                   onClick={() => setStatusFilter('idle')}
                   className="metric-ring-card"
                   style={{
-                    borderLeft: '4px solid #f59e0b',
+                    borderLeft: '4px solid #d97706',
                     cursor: 'pointer',
-                    boxShadow: statusFilter === 'idle' ? '0 0 12px rgba(245, 158, 11, 0.4)' : 'none',
-                    backgroundColor: statusFilter === 'idle' ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-card)'
+                    boxShadow: statusFilter === 'idle' ? '0 0 12px rgba(217, 119, 6, 0.4)' : 'none',
+                    backgroundColor: statusFilter === 'idle' ? 'rgba(217, 119, 6, 0.08)' : 'var(--bg-card)'
                   }}
                 >
                   <div className="metric-card-details">
-                    <span className="metric-card-title">Idle / Parked</span>
-                    <span className="metric-card-num" style={{ fontSize: '1.6rem', color: '#f59e0b' }}>
-                      {vehicles.filter(v => (telemetry[v.id]?.speed || 0) === 0).length}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <ParkingCircle size={16} style={{ color: '#d97706' }} />
+                      <span className="metric-card-title">Idle / Parked</span>
+                    </div>
+                    <span className="metric-card-value" style={{ color: '#d97706' }}>
+                      {vehicles.filter(v => telemetry[v.id]?.isOnline !== true || (telemetry[v.id]?.speed || 0) <= 1).length}
                     </span>
-                    <span className="metric-card-desc">Click to filter idle</span>
+                    <span className="metric-card-sub text-muted" style={{ fontSize: '0.65rem' }}>Click to filter idle</span>
                   </div>
                 </div>
 
@@ -2413,7 +2433,7 @@ export default function App() {
                                         gap: '4px'
                                       }}
                                     >
-                                      🟢 MOVING ({t.speed || 0} km/h)
+                                      🟢 MOVING
                                     </span>
                                   ) : (
                                     <span
@@ -2568,7 +2588,6 @@ export default function App() {
                         width: '38px',
                         height: '38px',
                         borderRadius: '50%',
-                        fontSize: '1.15rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -2577,7 +2596,7 @@ export default function App() {
                         backdropFilter: 'blur(4px)'
                       }}
                     >
-                      🎯
+                      <Crosshair size={18} style={{ color: '#06b6d4' }} />
                     </button>
                   </div>
 
@@ -2601,11 +2620,6 @@ export default function App() {
                       <strong style={{ fontSize: '0.72rem', color: (currentData.isOnline !== true || !currentData.lat) ? 'var(--accent-red)' : currentData.fix ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
                         {(currentData.isOnline !== true || !currentData.lat) ? '🔴 POWERED OFF / OFFLINE' : currentData.fix ? '🟢 ONLINE / LIVE GPS FIX' : '🟡 ONLINE / INDOOR STANDBY'}
                       </strong>
-                    </div>
-
-                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Direction Arrow</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.heading || 0}° Heading</span>
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
@@ -2635,11 +2649,6 @@ export default function App() {
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Altitude</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.altitude || 0} m</span>
-                    </div>
-
-                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Trip Distance</span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.tripDistance ? currentData.tripDistance.toFixed(1) : '0.0'} km</span>
                     </div>
@@ -2650,15 +2659,8 @@ export default function App() {
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route Stream</span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>{currentData.isOnline === true && currentData.lat ? 'Live Hardware Stream' : 'Offline'}</span>
-                    </div>
-
-                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>🛣️ Street / Road</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-cyan)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                        {currentData.isOnline !== true || typeof currentData.lat !== 'number' || typeof currentData.lng !== 'number' ? 'Offline' : (currentData.street || currentStreet[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
-                      </span>
                     </div>
 
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
@@ -2671,24 +2673,7 @@ export default function App() {
                     <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>📍 Full Address &amp; PIN</span>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right', maxWidth: '160px', wordBreak: 'break-word' }}>
-                        {currentData.isOnline !== true || typeof currentData.lat !== 'number' || typeof currentData.lng !== 'number' ? 'Offline' : (currentData.address || currentAddress[selectedVehicleId] || `${currentData.lat.toFixed(5)}, ${currentData.lng.toFixed(5)}`)}
                       </span>
-                    </div>
-
-                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Assigned Fixed Route Overlay</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>Configured</span>
-                    </div>
-
-                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Route Deviation Indicator</span>
-                      <strong style={{ fontSize: '0.72rem', color: currentData.isDeviated ? 'var(--accent-red)' : 'var(--accent-green)' }}>
-                        {currentData.routeDeviationMeters} m {currentData.isDeviated ? '(DEVIATED)' : '(OK)'}
-                      </strong>
-                    </div>
-
-                    <div className="param-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Geofence Zone Boundaries</span>
                     </div>
                   </div>
                 </div>

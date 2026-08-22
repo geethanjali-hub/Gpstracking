@@ -1413,8 +1413,8 @@ async function handleIncomingTelemetry(brokerName, topic, message) {
     // ⚡ 1. ZERO-DELAY WEBSOCKET BROADCAST TO FRONTEND (Executes immediately < 50ms)
     broadcast({ type: 'TELEMETRY_UPDATE', topic, vehicleId, data: telemetryDoc });
 
-    // 📜 2. HISTORICAL ROUTE LOGGING (Stores history trail points in MongoDB 'telemetry_histories')
-    if (hasValidCoords) {
+    // 📜 2. HISTORICAL ROUTE LOGGING (Stores clean history trail points)
+    if (hasValidCoords && lat !== 0 && lng !== 0 && lat >= 6.0 && lat <= 38.0 && lng >= 68.0 && lng <= 98.0) {
       TelemetryHistory.create({
         vehicleId,
         lat,
