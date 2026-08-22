@@ -3785,28 +3785,30 @@ export default function App() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: '0.75rem',
                                 backgroundColor: '#ffffff',
-                                padding: '0.65rem 0.85rem',
+                                padding: '0.75rem 0.85rem',
                                 borderRadius: '6px',
                                 border: '1px solid #e2e8f0',
                                 boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
                               }}
                             >
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: '180px', flex: 1, wordBreak: 'break-all' }}>
                                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>
                                   📡 {v.name}
                                 </strong>
                                 <div style={{ fontSize: '0.72rem', color: '#0284c7', fontFamily: 'var(--font-mono)' }}>
                                   🆔 Tracker ID: <b>{v.id}</b>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: '#475569' }}>
-                                  🛰️ Topic: <code style={{ color: '#0369a1' }}>{v.topic || `sedhupathi/${v.id}/data`}</code>
+                                <div style={{ fontSize: '0.7rem', color: '#475569', wordBreak: 'break-all' }}>
+                                  🛰️ Topic: <code style={{ color: '#0369a1', wordBreak: 'break-all' }}>{v.topic || `sedhupathi/${v.id}/data`}</code>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                                  🌐 Broker: <code style={{ color: '#047857' }}>{v.broker || 'mqtt://test.mosquitto.org:1883'}</code>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', wordBreak: 'break-all' }}>
+                                  🌐 Broker: <code style={{ color: '#047857', wordBreak: 'break-all' }}>{v.broker || 'mqtt://test.mosquitto.org:1883'}</code>
                                 </div>
                                 {phones.length > 0 && (
-                                  <div style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600 }}>
+                                  <div style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600, wordBreak: 'break-all' }}>
                                     📱 SMS Emergency Contacts ({phones.length}): {phones.join(', ')}
                                   </div>
                                 )}
@@ -3817,7 +3819,7 @@ export default function App() {
                                 )}
                               </div>
 
-                              <div style={{ display: 'flex', gap: '0.35rem' }}>
+                              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, alignSelf: 'flex-start' }}>
                                 <button
                                   onClick={() => handleStartEditVehicle(v)}
                                   title={`Edit ${v.name}`}
